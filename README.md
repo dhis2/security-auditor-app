@@ -2,4 +2,4 @@
 
 ## Credits
 
-Initial design of the application was inspired by https://github.com/dhis2/data-administration-app.
+Initial design of the application was inspired by the [Data Administration App](https://github.com/dhis2/data-administration-app).
