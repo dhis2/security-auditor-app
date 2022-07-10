@@ -1,7 +1,7 @@
 const config = {
     type: 'app',
 
-    title: 'Security Audtior',
+    title: 'Security Auditor',
     coreApp: false,
 
     entryPoints: {
