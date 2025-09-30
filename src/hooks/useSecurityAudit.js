@@ -78,33 +78,119 @@ const securityChecks = [
         description: 'Checking CORS whitelist configuration',
         query: {
             corsWhitelist: {
-                resource: 'systemSettings/corsWhitelist',
+                resource: 'configuration/corsWhitelist',
             },
         },
         evaluate: (data) => {
-            const whitelist = data.corsWhitelist || []
+            const whitelistData = data.corsWhitelist
+            const whitelist = Array.isArray(whitelistData)
+                ? whitelistData
+                : whitelistData && typeof whitelistData === 'string'
+                ? whitelistData.split(',').map((s) => s.trim()).filter(Boolean)
+                : []
+
             const hasWildcard = whitelist.some((url) => url.includes('*'))
 
             return {
-                status: hasWildcard ? 'fail' : 'pass',
+                status: hasWildcard
+                    ? 'fail'
+                    : whitelist.length > 0
+                    ? 'warning'
+                    : 'pass',
                 message: hasWildcard
                     ? 'CORS whitelist contains wildcards - security risk!'
                     : whitelist.length > 0
-                    ? `CORS properly configured with ${whitelist.length} allowed origins`
+                    ? `CORS whitelist is configured with ${whitelist.length} allowed origins`
                     : 'CORS whitelist is empty',
-                details: hasWildcard ? whitelist.join(', ') : null,
+                details:
+                    hasWildcard || whitelist.length > 0
+                        ? whitelist.join(', ')
+                        : null,
             }
         },
     },
     {
-        id: 'user-credentials',
-        title: 'User Account Security',
-        description: 'Analyzing user credentials and password policies',
+        id: 'users-never-logged-in',
+        title: 'Users Never Logged In',
+        description: 'Checking for active accounts that have never been used',
         query: {
             users: {
                 resource: 'users',
                 params: {
-                    fields: 'id,username,disabled,lastLogin,userCredentials[passwordLastUpdated]',
+                    fields: 'id,username,disabled,lastLogin,created',
+                    paging: false,
+                    filter: 'disabled:eq:false',
+                },
+            },
+        },
+        evaluate: (data) => {
+            const users = data.users.users
+            const neverLoggedIn = users.filter(
+                (user) => !user.lastLogin || user.lastLogin === ''
+            )
+
+            const hasIssue = neverLoggedIn.length > 0
+
+            return {
+                status: hasIssue ? 'warning' : 'pass',
+                message: hasIssue
+                    ? `Found ${neverLoggedIn.length} active accounts that have never logged in`
+                    : 'All active users have logged in at least once',
+                details: hasIssue
+                    ? `Consider removing unused accounts: ${neverLoggedIn.slice(0, 5).map((u) => u.username).join(', ')}${neverLoggedIn.length > 5 ? ` and ${neverLoggedIn.length - 5} more` : ''}`
+                    : null,
+            }
+        },
+    },
+    {
+        id: 'users-inactive-3-months',
+        title: 'Inactive User Accounts (3+ Months)',
+        description: 'Checking for accounts with no recent activity',
+        query: {
+            users: {
+                resource: 'users',
+                params: {
+                    fields: 'id,username,disabled,lastLogin',
+                    paging: false,
+                    filter: 'disabled:eq:false',
+                },
+            },
+        },
+        evaluate: (data) => {
+            const users = data.users.users
+            const threeMonthsAgo = new Date()
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+
+            const inactiveUsers = users.filter((user) => {
+                if (!user.lastLogin || user.lastLogin === '') {
+                    return false // Exclude users who never logged in (handled by other check)
+                }
+                const lastLogin = new Date(user.lastLogin)
+                return lastLogin < threeMonthsAgo
+            })
+
+            const hasIssue = inactiveUsers.length > 0
+
+            return {
+                status: hasIssue ? 'warning' : 'pass',
+                message: hasIssue
+                    ? `Found ${inactiveUsers.length} users who haven't logged in for 3+ months`
+                    : 'All users with login history have recent activity',
+                details: hasIssue
+                    ? `Consider disabling inactive accounts: ${inactiveUsers.slice(0, 5).map((u) => u.username).join(', ')}${inactiveUsers.length > 5 ? ` and ${inactiveUsers.length - 5} more` : ''}`
+                    : null,
+            }
+        },
+    },
+    {
+        id: 'password-age',
+        title: 'Password Age Verification',
+        description: 'Checking for stale or unchanged passwords',
+        query: {
+            users: {
+                resource: 'users',
+                params: {
+                    fields: 'id,username,disabled,userCredentials[passwordLastUpdated]',
                     paging: false,
                     filter: 'disabled:eq:false',
                 },
@@ -115,22 +201,140 @@ const securityChecks = [
             const oneYearAgo = new Date()
             oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
 
-            const staleUsers = users.filter((user) => {
-                const lastLogin = user.lastLogin
-                    ? new Date(user.lastLogin)
-                    : null
-                return !lastLogin || lastLogin < oneYearAgo
+            const stalePasswords = users.filter((user) => {
+                const passwordLastUpdated =
+                    user.userCredentials?.passwordLastUpdated
+                if (!passwordLastUpdated || passwordLastUpdated === '') {
+                    return true // Never changed
+                }
+                const lastUpdated = new Date(passwordLastUpdated)
+                return lastUpdated < oneYearAgo
             })
 
-            const hasIssue = staleUsers.length > 0
+            const hasIssue = stalePasswords.length > 0
 
             return {
                 status: hasIssue ? 'warning' : 'pass',
                 message: hasIssue
-                    ? `Found ${staleUsers.length} users who haven't logged in for over a year`
-                    : 'All active users have recent activity',
+                    ? `Found ${stalePasswords.length} users with passwords older than 1 year or never changed`
+                    : 'All user passwords are up to date',
                 details: hasIssue
-                    ? `Consider disabling inactive accounts: ${staleUsers.slice(0, 5).map((u) => u.username).join(', ')}${staleUsers.length > 5 ? '...' : ''}`
+                    ? `Users with stale passwords: ${stalePasswords.slice(0, 5).map((u) => u.username).join(', ')}${stalePasswords.length > 5 ? ` and ${stalePasswords.length - 5} more` : ''}`
+                    : null,
+            }
+        },
+    },
+    {
+        id: 'password-policy',
+        title: 'Password Policy Configuration',
+        description: 'Verifying minimum password length requirements',
+        query: {
+            settings: {
+                resource: 'systemSettings',
+                params: {
+                    key: ['minPasswordLength'],
+                },
+            },
+        },
+        evaluate: (data) => {
+            const minPasswordLength = parseInt(
+                data.settings?.minPasswordLength || 0,
+                10
+            )
+            const hasIssue = minPasswordLength < 8
+
+            return {
+                status: hasIssue ? 'warning' : 'pass',
+                message: hasIssue
+                    ? `Minimum password length is ${minPasswordLength} characters - consider increasing to at least 8`
+                    : `Minimum password length is properly configured (${minPasswordLength} characters)`,
+                details: hasIssue
+                    ? 'Weak passwords increase the risk of unauthorized access. Set minPasswordLength to at least 8.'
+                    : null,
+            }
+        },
+    },
+    {
+        id: 'password-expiry-policy',
+        title: 'Password Expiry Policy',
+        description: 'Checking if forced password changes are enabled',
+        query: {
+            settings: {
+                resource: 'systemSettings',
+                params: {
+                    key: ['credentialsExpires'],
+                },
+            },
+        },
+        evaluate: (data) => {
+            const credentialsExpires =
+                data.settings?.credentialsExpires || '0'
+            const expiryDays = parseInt(credentialsExpires, 10)
+            const hasIssue = expiryDays === 0
+
+            return {
+                status: hasIssue ? 'warning' : 'pass',
+                message: hasIssue
+                    ? 'Password expiry is disabled - users never required to change passwords'
+                    : `Password expiry is enabled (passwords expire after ${expiryDays} days)`,
+                details: hasIssue
+                    ? 'Consider enabling password expiry to force periodic password changes and reduce the risk of compromised credentials.'
+                    : null,
+            }
+        },
+    },
+    {
+        id: 'email-verification',
+        title: 'Email Verification Enforcement',
+        description: 'Checking if email verification is enforced',
+        query: {
+            settings: {
+                resource: 'systemSettings',
+                params: {
+                    key: ['enforceVerifiedEmail'],
+                },
+            },
+        },
+        evaluate: (data) => {
+            const enforceVerifiedEmail =
+                data.settings?.enforceVerifiedEmail === 'true'
+            const hasIssue = !enforceVerifiedEmail
+
+            return {
+                status: hasIssue ? 'warning' : 'pass',
+                message: hasIssue
+                    ? 'Email verification is not enforced'
+                    : 'Email verification is enforced',
+                details: hasIssue
+                    ? 'Consider enabling email verification to ensure user accounts are associated with valid email addresses.'
+                    : null,
+            }
+        },
+    },
+    {
+        id: 'https-connection',
+        title: 'HTTPS Connection Security',
+        description: 'Verifying secure connection to the server',
+        query: {
+            // Dummy query to trigger the check
+            me: {
+                resource: 'me',
+                params: {
+                    fields: 'id',
+                },
+            },
+        },
+        evaluate: (data) => {
+            const isHttps = window.location.protocol === 'https:'
+            const hasIssue = !isHttps
+
+            return {
+                status: hasIssue ? 'fail' : 'pass',
+                message: hasIssue
+                    ? `Connection is using insecure HTTP protocol`
+                    : 'Connection is secured with HTTPS',
+                details: hasIssue
+                    ? `Current protocol: ${window.location.protocol}. HTTPS should be used to encrypt data in transit and prevent man-in-the-middle attacks.`
                     : null,
             }
         },
