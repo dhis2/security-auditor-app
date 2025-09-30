@@ -339,6 +339,74 @@ const securityChecks = [
             }
         },
     },
+    {
+        id: 'default-admin-password',
+        title: 'Default Admin Password Check',
+        description: 'Checking if admin account uses default password',
+        query: {
+            adminUser: {
+                resource: 'users',
+                params: {
+                    fields: 'id,username,userCredentials[passwordLastUpdated]',
+                    filter: 'username:eq:admin',
+                },
+            },
+        },
+        evaluate: (data) => {
+            const users = data.adminUser?.users || []
+            if (users.length === 0) {
+                return {
+                    status: 'pass',
+                    message: 'No admin user found',
+                    details: null,
+                }
+            }
+
+            const adminUser = users[0]
+            const passwordLastUpdated =
+                adminUser.userCredentials?.passwordLastUpdated
+            const hasDefaultPassword =
+                !passwordLastUpdated || passwordLastUpdated === ''
+
+            return {
+                status: hasDefaultPassword ? 'fail' : 'pass',
+                message: hasDefaultPassword
+                    ? 'Admin account is using default password!'
+                    : 'Admin password has been changed',
+                details: hasDefaultPassword
+                    ? 'CRITICAL: The admin account password has never been changed. Change it immediately to prevent unauthorized access.'
+                    : null,
+            }
+        },
+    },
+    {
+        id: 'account-lockout',
+        title: 'Account Lockout Policy',
+        description: 'Checking if account lockout after failed login attempts is enabled',
+        query: {
+            settings: {
+                resource: 'systemSettings',
+                params: {
+                    key: ['lockMultipleFailedLogins'],
+                },
+            },
+        },
+        evaluate: (data) => {
+            const lockMultipleFailedLogins =
+                data.settings?.lockMultipleFailedLogins === 'true'
+            const hasIssue = !lockMultipleFailedLogins
+
+            return {
+                status: hasIssue ? 'warning' : 'pass',
+                message: hasIssue
+                    ? 'Account lockout after failed login attempts is disabled'
+                    : 'Account lockout after failed login attempts is enabled',
+                details: hasIssue
+                    ? 'Consider enabling account lockout to prevent brute force password attacks.'
+                    : null,
+            }
+        },
+    },
 ]
 
 export const useSecurityAudit = () => {
