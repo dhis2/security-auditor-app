@@ -5,17 +5,78 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-09-30T08:38:40.980Z\n"
-"PO-Revision-Date: 2025-09-30T08:38:40.980Z\n"
+"POT-Creation-Date: 2025-09-30T12:32:42.299Z\n"
+"PO-Revision-Date: 2025-09-30T12:32:42.299Z\n"
 
-msgid "ERROR"
-msgstr "ERROR"
+msgid "Pass"
+msgstr "Pass"
 
-msgid "Loading..."
-msgstr "Loading..."
+msgid "Warning"
+msgstr "Warning"
 
-msgid "Hello {{name}}"
-msgstr "Hello {{name}}"
+msgid "Fail"
+msgstr "Fail"
 
-msgid "Welcome to DHIS2!"
-msgstr "Welcome to DHIS2!"
+msgid "Error"
+msgstr "Error"
+
+msgid "Running"
+msgstr "Running"
+
+msgid "Unknown"
+msgstr "Unknown"
+
+msgid "Ready to audit"
+msgstr "Ready to audit"
+
+msgid "Click \"Start Audit\" to begin the security assessment."
+msgstr "Click \"Start Audit\" to begin the security assessment."
+
+msgid "Audit Error"
+msgstr "Audit Error"
+
+msgid "An error occurred while running the security audit. Please try again."
+msgstr "An error occurred while running the security audit. Please try again."
+
+msgid "Audit in Progress"
+msgstr "Audit in Progress"
+
+msgid "Running security checks... {{current}} of {{total}}"
+msgstr "Running security checks... {{current}} of {{total}}"
+
+msgid "Audit Completed"
+msgstr "Audit Completed"
+
+msgid "Critical security issues found. Please review the findings below."
+msgstr "Critical security issues found. Please review the findings below."
+
+msgid "Security audit completed with warnings. Review recommended."
+msgstr "Security audit completed with warnings. Review recommended."
+
+msgid "All security checks passed successfully!"
+msgstr "All security checks passed successfully!"
+
+msgid "Check"
+msgstr "Check"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Result"
+msgstr "Result"
+
+msgid "Security Auditor"
+msgstr "Security Auditor"
+
+msgid ""
+"Analyze your DHIS2 instance for security vulnerabilities and configuration "
+"issues"
+msgstr ""
+"Analyze your DHIS2 instance for security vulnerabilities and configuration "
+"issues"
+
+msgid "Auditing..."
+msgstr "Auditing..."
+
+msgid "Start Audit"
+msgstr "Start Audit"

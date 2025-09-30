@@ -1820,7 +1820,7 @@
   resolved "https://registry.yarnpkg.com/@dhis2/ui-icons/-/ui-icons-10.9.1.tgz#9a965180026854009a8c4e8a219f349e23bc3f6a"
   integrity sha512-z2j/gdXe0izY5L0L38qRVbAoewmG/9XgFGyR416mgfpI2L3nmIqX3sLbbrpwMT18P4N4eEWhYzO52rxlGSWp0Q==
 
-"@dhis2/ui@^10.7.8":
+"@dhis2/ui@^10.7.8", "@dhis2/ui@^10.9.1":
   version "10.9.1"
   resolved "https://registry.yarnpkg.com/@dhis2/ui/-/ui-10.9.1.tgz#3f5108f88da758fe0df00ac246b45a80c7687423"
   integrity sha512-WReefEmaot+oUW3J6ARt3DjzCFzb4OqsBeWazNPIcv8nzxIvsO1VjfhK3W8OrJS0MZR5DSrz+g3G5Y1+c2lhKw==

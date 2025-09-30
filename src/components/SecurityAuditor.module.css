@@ -1,0 +1,31 @@
+.container {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.header {
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.headerContent {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+}
+
+.title {
+    margin: 0 0 8px 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #212934;
+}
+
+.subtitle {
+    margin: 0;
+    font-size: 14px;
+    color: #757575;
+    max-width: 600px;
+}
