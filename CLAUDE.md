@@ -67,5 +67,4 @@ All DHIS2 API interactions use the `@dhis2/app-runtime` hooks:
 
 ## DHIS2 Platform Resources
 
-- [DHIS2 Application Platform Documentation](https://platform.dhis2.nu/)
-- [DHIS2 Application Runtime Documentation](https://runtime.dhis2.nu/)
+- [DHIS2 Application Platform Documentation](https://developers.dhis2.org/)
