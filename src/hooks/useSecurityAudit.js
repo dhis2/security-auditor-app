@@ -7,6 +7,7 @@ const securityChecks = [
         id: 'user-roles',
         title: 'User Roles Configuration',
         description: 'Checking for users with excessive privileges',
+        ranking: 0,
         query: {
             userRoles: {
                 resource: 'userRoles',
@@ -37,6 +38,7 @@ const securityChecks = [
         id: 'system-settings',
         title: 'System Security Settings',
         description: 'Verifying security-related system settings',
+        ranking: 0,
         query: {
             settings: {
                 resource: 'systemSettings',
@@ -76,6 +78,7 @@ const securityChecks = [
         id: 'cors-whitelist',
         title: 'CORS Configuration',
         description: 'Checking CORS whitelist configuration',
+        ranking: 0,
         query: {
             corsWhitelist: {
                 resource: 'configuration/corsWhitelist',
@@ -113,6 +116,7 @@ const securityChecks = [
         id: 'users-never-logged-in',
         title: 'Users Never Logged In',
         description: 'Checking for active accounts that have never been used',
+        ranking: 0,
         query: {
             users: {
                 resource: 'users',
@@ -146,6 +150,7 @@ const securityChecks = [
         id: 'users-inactive-3-months',
         title: 'Inactive User Accounts (3+ Months)',
         description: 'Checking for accounts with no recent activity',
+        ranking: 0,
         query: {
             users: {
                 resource: 'users',
@@ -186,6 +191,7 @@ const securityChecks = [
         id: 'password-age',
         title: 'Password Age Verification',
         description: 'Checking for stale or unchanged passwords',
+        ranking: 0,
         query: {
             users: {
                 resource: 'users',
@@ -228,6 +234,7 @@ const securityChecks = [
         id: 'password-policy',
         title: 'Password Policy Configuration',
         description: 'Verifying minimum password length requirements',
+        ranking: 0,
         query: {
             settings: {
                 resource: 'systemSettings',
@@ -258,6 +265,7 @@ const securityChecks = [
         id: 'password-expiry-policy',
         title: 'Password Expiry Policy',
         description: 'Checking if forced password changes are enabled',
+        ranking: 0,
         query: {
             settings: {
                 resource: 'systemSettings',
@@ -287,6 +295,7 @@ const securityChecks = [
         id: 'email-verification',
         title: 'Email Verification Enforcement',
         description: 'Checking if email verification is enforced',
+        ranking: 0,
         query: {
             settings: {
                 resource: 'systemSettings',
@@ -315,6 +324,7 @@ const securityChecks = [
         id: 'https-connection',
         title: 'HTTPS Connection Security',
         description: 'Verifying secure connection to the server',
+        ranking: 0,
         query: {
             // Dummy query to trigger the check
             me: {
@@ -343,6 +353,7 @@ const securityChecks = [
         id: 'default-admin-password',
         title: 'Default Admin Password Check',
         description: 'Checking if admin account uses default password',
+        ranking: 10,
         query: {
             adminUser: {
                 resource: 'users',
@@ -383,6 +394,7 @@ const securityChecks = [
         id: 'account-lockout',
         title: 'Account Lockout Policy',
         description: 'Checking if account lockout after failed login attempts is enabled',
+        ranking: 0,
         query: {
             settings: {
                 resource: 'systemSettings',
@@ -404,6 +416,137 @@ const securityChecks = [
                 details: hasIssue
                     ? 'Consider enabling account lockout to prevent brute force password attacks.'
                     : null,
+            }
+        },
+    },
+    {
+        id: 'hsts-header',
+        title: 'HTTP Strict Transport Security (HSTS)',
+        description: 'Checking for HSTS header to enforce HTTPS',
+        ranking: 0,
+        query: {
+            // We need to make an async check, so use a dummy query
+            me: {
+                resource: 'me',
+                params: {
+                    fields: 'id',
+                },
+            },
+        },
+        evaluate: async (data) => {
+            try {
+                // Make a fetch request to check response headers
+                const response = await fetch(
+                    `${window.location.origin}/api/me`,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                    }
+                )
+
+                const hstsHeader = response.headers.get(
+                    'strict-transport-security'
+                )
+
+                if (hstsHeader) {
+                    return {
+                        status: 'pass',
+                        message: 'HSTS header is configured',
+                        details: `Strict-Transport-Security: ${hstsHeader}`,
+                    }
+                } else {
+                    return {
+                        status: 'warning',
+                        message: 'HSTS header is not present',
+                        details:
+                            'The server is not sending the Strict-Transport-Security header. This header enforces HTTPS connections and prevents protocol downgrade attacks. Consider adding: "Strict-Transport-Security: max-age=31536000; includeSubDomains"',
+                    }
+                }
+            } catch (error) {
+                return {
+                    status: 'warning',
+                    message: 'Unable to check HSTS header',
+                    details: `Error checking HSTS header: ${error.message}. This may be due to CORS restrictions. Manually verify if the server sends the "Strict-Transport-Security" header.`,
+                }
+            }
+        },
+    },
+    {
+        id: 'csp-header',
+        title: 'Content Security Policy (CSP)',
+        description: 'Checking for CSP header and violations',
+        ranking: 0,
+        query: {
+            me: {
+                resource: 'me',
+                params: {
+                    fields: 'id',
+                },
+            },
+        },
+        evaluate: async (data) => {
+            try {
+                // Make a fetch request to check response headers
+                const response = await fetch(
+                    `${window.location.origin}/api/me`,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                    }
+                )
+
+                const cspHeader =
+                    response.headers.get('content-security-policy') ||
+                    response.headers.get('content-security-policy-report-only')
+
+                const isReportOnly = !response.headers.get(
+                    'content-security-policy'
+                )
+
+                if (cspHeader) {
+                    // Check for common CSP directives
+                    const hasDefaultSrc = cspHeader.includes('default-src')
+                    const hasScriptSrc = cspHeader.includes('script-src')
+                    const hasUnsafeInline = cspHeader.includes("'unsafe-inline'")
+                    const hasUnsafeEval = cspHeader.includes("'unsafe-eval'")
+
+                    const warnings = []
+                    if (isReportOnly) {
+                        warnings.push('CSP is in report-only mode')
+                    }
+                    if (hasUnsafeInline) {
+                        warnings.push("'unsafe-inline' is present")
+                    }
+                    if (hasUnsafeEval) {
+                        warnings.push("'unsafe-eval' is present")
+                    }
+                    if (!hasDefaultSrc && !hasScriptSrc) {
+                        warnings.push('No default-src or script-src directive')
+                    }
+
+                    const hasIssues = warnings.length > 0
+
+                    return {
+                        status: hasIssues ? 'warning' : 'pass',
+                        message: hasIssues
+                            ? `CSP header configured with warnings: ${warnings.join(', ')}`
+                            : 'CSP header is properly configured',
+                        details: `Content-Security-Policy${isReportOnly ? '-Report-Only' : ''}: ${cspHeader}`,
+                    }
+                } else {
+                    return {
+                        status: 'warning',
+                        message: 'CSP header is not present',
+                        details:
+                            'The server is not sending a Content-Security-Policy header. CSP helps prevent XSS attacks, clickjacking, and other code injection attacks. Consider implementing a CSP policy.',
+                    }
+                }
+            } catch (error) {
+                return {
+                    status: 'warning',
+                    message: 'Unable to check CSP header',
+                    details: `Error checking CSP header: ${error.message}. This may be due to CORS restrictions. Manually verify if the server sends the "Content-Security-Policy" header.`,
+                }
             }
         },
     },
@@ -431,6 +574,7 @@ export const useSecurityAudit = () => {
                         id: check.id,
                         title: check.title,
                         description: check.description,
+                        ranking: check.ranking || 0,
                         status: 'running',
                         message: null,
                         details: null,
@@ -441,12 +585,12 @@ export const useSecurityAudit = () => {
                     // Execute the query
                     const data = await engine.query(check.query)
 
-                    // Evaluate the result
-                    const result = check.evaluate(data)
+                    // Evaluate the result (handle both sync and async evaluate functions)
+                    const result = await Promise.resolve(check.evaluate(data))
 
-                    // Update the finding with results
-                    setFindings((prev) =>
-                        prev.map((finding) =>
+                    // Update the finding with results and sort by criticality and ranking
+                    setFindings((prev) => {
+                        const updated = prev.map((finding) =>
                             finding.id === check.id
                                 ? {
                                       ...finding,
@@ -456,7 +600,20 @@ export const useSecurityAudit = () => {
                                   }
                                 : finding
                         )
-                    )
+
+                        // Sort by criticality (fail > warning > pass) and then by ranking
+                        return updated.sort((a, b) => {
+                            const statusOrder = { fail: 0, warning: 1, error: 2, pass: 3, running: 4 }
+                            const statusDiff = statusOrder[a.status] - statusOrder[b.status]
+
+                            if (statusDiff !== 0) {
+                                return statusDiff
+                            }
+
+                            // Within same status, sort by ranking (higher ranking first)
+                            return (b.ranking || 0) - (a.ranking || 0)
+                        })
+                    })
                 } catch (error) {
                     // Handle individual check errors
                     setFindings((prev) =>

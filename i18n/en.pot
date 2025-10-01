@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-09-30T12:32:42.299Z\n"
-"PO-Revision-Date: 2025-09-30T12:32:42.299Z\n"
+"POT-Creation-Date: 2025-10-01T05:51:11.233Z\n"
+"PO-Revision-Date: 2025-10-01T05:51:11.233Z\n"
 
 msgid "Pass"
 msgstr "Pass"
@@ -80,3 +80,11 @@ msgstr "Auditing..."
 
 msgid "Start Audit"
 msgstr "Start Audit"
+
+msgctxt "Application title"
+msgid "__MANIFEST_APP_TITLE"
+msgstr "Security Auditor"
+
+msgctxt "Application description"
+msgid "__MANIFEST_APP_DESCRIPTION"
+msgstr "DHIS2 Security Auditor"

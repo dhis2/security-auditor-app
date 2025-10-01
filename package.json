@@ -1,8 +1,9 @@
 {
-  "name": "dhis-security-auditor",
+  "name": "security-auditor-app",
   "version": "1.0.0",
-  "description": "",
+  "description": "DHIS2 Security Auditor",
   "license": "BSD-3-Clause",
+  "author": "Michael Markevich",
   "private": true,
   "scripts": {
     "build": "d2-app-scripts build",
