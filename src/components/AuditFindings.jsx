@@ -66,12 +66,28 @@ const StatusBadge = ({ status }) => {
 
 export const AuditFindings = ({ findings, auditStatus, progress }) => {
     const [generating, setGenerating] = useState(false)
+    const [webServer, setWebServer] = useState('Loading...')
     const { data: systemInfoData } = useDataQuery(systemInfoQuery)
 
-    const generatePDFReport = () => {
+    const generatePDFReport = async () => {
         setGenerating(true)
 
         try {
+            // Fetch web server info
+            let serverHeader = 'Unable to detect'
+            try {
+                const response = await fetch(
+                    `${window.location.origin}/api/me`,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                    }
+                )
+                serverHeader = response.headers.get('server') || 'Not disclosed'
+            } catch (error) {
+                serverHeader = 'Unable to detect'
+            }
+
             const systemInfo = systemInfoData?.systemInfo || {}
             const reportDate = new Date().toLocaleString()
             const appVersion = '1.0.0' // Version from package.json
@@ -186,6 +202,14 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
             <div class="info-value">${appVersion}</div>
         </div>
         <div class="info-item">
+            <div class="info-label">Server URL</div>
+            <div class="info-value">${window.location.origin}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">System ID</div>
+            <div class="info-value">${systemInfo.systemId || 'N/A'}</div>
+        </div>
+        <div class="info-item">
             <div class="info-label">DHIS2 Version</div>
             <div class="info-value">${systemInfo.version || 'N/A'}</div>
         </div>
@@ -204,6 +228,10 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
         <div class="info-item">
             <div class="info-label">Servlet Container</div>
             <div class="info-value">${systemInfo.serverInfo || 'N/A'}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Web Server</div>
+            <div class="info-value">${serverHeader}</div>
         </div>
         <div class="info-item">
             <div class="info-label">Database</div>

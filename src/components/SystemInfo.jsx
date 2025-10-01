@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CircularLoader, NoticeBox } from '@dhis2/ui'
 import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
@@ -12,6 +12,27 @@ const query = {
 
 export const SystemInfo = () => {
     const { loading, error, data } = useDataQuery(query)
+    const [webServer, setWebServer] = useState(i18n.t('Loading...'))
+
+    useEffect(() => {
+        const fetchWebServerInfo = async () => {
+            try {
+                const response = await fetch(
+                    `${window.location.origin}/api/me`,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                    }
+                )
+                const serverHeader = response.headers.get('server')
+                setWebServer(serverHeader || i18n.t('Not disclosed'))
+            } catch (error) {
+                setWebServer(i18n.t('Unable to detect'))
+            }
+        }
+
+        fetchWebServerInfo()
+    }, [])
 
     if (loading) {
         return (
@@ -38,6 +59,14 @@ export const SystemInfo = () => {
         {
             label: i18n.t('Security Auditor Version'),
             value: appVersion,
+        },
+        {
+            label: i18n.t('Server URL'),
+            value: window.location.origin,
+        },
+        {
+            label: i18n.t('System ID'),
+            value: systemInfo.systemId || i18n.t('N/A'),
         },
         {
             label: i18n.t('DHIS2 Version'),
@@ -78,6 +107,10 @@ export const SystemInfo = () => {
         {
             label: i18n.t('Servlet Container'),
             value: systemInfo.serverInfo || i18n.t('N/A'),
+        },
+        {
+            label: i18n.t('Web Server'),
+            value: webServer,
         },
         {
             label: i18n.t('Database Name'),

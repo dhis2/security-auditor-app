@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-10-01T08:00:32.973Z\n"
-"PO-Revision-Date: 2025-10-01T08:00:32.973Z\n"
+"POT-Creation-Date: 2025-10-01T09:29:56.212Z\n"
+"PO-Revision-Date: 2025-10-01T09:29:56.212Z\n"
 
 msgid "Pass"
 msgstr "Pass"
@@ -177,14 +177,32 @@ msgstr "Configuration"
 msgid "System Info"
 msgstr "System Info"
 
+msgid "Loading..."
+msgstr "Loading..."
+
+msgid "Not disclosed"
+msgstr "Not disclosed"
+
+msgid "Unable to detect"
+msgstr "Unable to detect"
+
 msgid "Failed to load system information"
 msgstr "Failed to load system information"
 
-msgid "DHIS2 Version"
-msgstr "DHIS2 Version"
+msgid "Security Auditor Version"
+msgstr "Security Auditor Version"
+
+msgid "Server URL"
+msgstr "Server URL"
+
+msgid "System ID"
+msgstr "System ID"
 
 msgid "N/A"
 msgstr "N/A"
+
+msgid "DHIS2 Version"
+msgstr "DHIS2 Version"
 
 msgid "DHIS2 Build Revision"
 msgstr "DHIS2 Build Revision"
@@ -213,6 +231,9 @@ msgstr "Java VM Name"
 msgid "Servlet Container"
 msgstr "Servlet Container"
 
+msgid "Web Server"
+msgstr "Web Server"
+
 msgid "Database Name"
 msgstr "Database Name"
 
@@ -233,3 +254,11 @@ msgstr "System Information"
 
 msgid "Information about the DHIS2 instance and server environment"
 msgstr "Information about the DHIS2 instance and server environment"
+
+msgctxt "Application title"
+msgid "__MANIFEST_APP_TITLE"
+msgstr "Security Auditor"
+
+msgctxt "Application description"
+msgid "__MANIFEST_APP_DESCRIPTION"
+msgstr "DHIS2 Security Auditor"

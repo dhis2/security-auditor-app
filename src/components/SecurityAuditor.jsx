@@ -16,6 +16,8 @@ export const SecurityAuditor = () => {
     const isRunning = auditStatus === 'running'
 
     const handleStartAudit = async () => {
+        // Navigate to Audit Results tab
+        setActiveTab('audit')
         // Reload configuration before starting audit to ensure latest settings are used
         const freshConfig = await reloadConfig()
         // Pass the fresh config directly to runAudit to avoid stale closure issues

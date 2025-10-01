@@ -36,46 +36,6 @@ const getSecurityChecks = (config) => [
         },
     },
     {
-        id: 'system-settings',
-        title: 'System Security Settings',
-        description: 'Verifying security-related system settings',
-        ranking: 0,
-        query: {
-            settings: {
-                resource: 'systemSettings',
-                params: {
-                    key: [
-                        'keyAccountRecovery',
-                        'keySelfRegistrationNoRecaptcha',
-                        'keyRequireAddToView',
-                        'keyOpenIdProvider',
-                    ],
-                },
-            },
-        },
-        evaluate: (data) => {
-            const accountRecovery = data.settings?.keyAccountRecovery === 'true'
-            const selfRegNoRecaptcha =
-                data.settings?.keySelfRegistrationNoRecaptcha === 'true'
-            const hasIssues = accountRecovery || selfRegNoRecaptcha
-
-            return {
-                status: hasIssues ? 'warning' : 'pass',
-                message: hasIssues
-                    ? 'Some security settings may need attention'
-                    : 'System security settings look good',
-                details: [
-                    accountRecovery &&
-                        'Account recovery is enabled (ensure email is properly configured)',
-                    selfRegNoRecaptcha &&
-                        'Self-registration without reCAPTCHA is enabled',
-                ]
-                    .filter(Boolean)
-                    .join('; '),
-            }
-        },
-    },
-    {
         id: 'cors-whitelist',
         title: 'CORS Configuration',
         description: 'Checking CORS whitelist configuration',
@@ -471,6 +431,261 @@ const getSecurityChecks = (config) => [
                     status: 'warning',
                     message: 'Unable to check HSTS header',
                     details: `Error checking HSTS header: ${error.message}. This may be due to CORS restrictions. Manually verify if the server sends the "Strict-Transport-Security" header.`,
+                }
+            }
+        },
+    },
+    {
+        id: 'server-header-exposure',
+        title: 'Server Header Exposure',
+        description: 'Checking if server version information is exposed',
+        ranking: 0,
+        query: {
+            me: {
+                resource: 'me',
+                params: {
+                    fields: 'id',
+                },
+            },
+        },
+        evaluate: async (data) => {
+            try {
+                const response = await fetch(
+                    `${window.location.origin}/api/me`,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                    }
+                )
+
+                const serverHeader = response.headers.get('server')
+
+                if (!serverHeader) {
+                    return {
+                        status: 'pass',
+                        message: 'Server header is not exposed',
+                        details: 'The server does not disclose version information in the Server header, which is a good security practice.',
+                    }
+                } else {
+                    return {
+                        status: 'warning',
+                        message: 'Server header exposes version information',
+                        details: `Server: ${serverHeader}. Exposing server version information can help attackers identify known vulnerabilities. Consider removing or obfuscating the Server header.`,
+                    }
+                }
+            } catch (error) {
+                return {
+                    status: 'error',
+                    message: 'Unable to check Server header',
+                    details: `Error checking Server header: ${error.message}`,
+                }
+            }
+        },
+    },
+    {
+        id: 'coop-header',
+        title: 'Cross-Origin-Opener-Policy (COOP)',
+        description: 'Checking for COOP header to isolate browsing context',
+        ranking: 0,
+        query: {
+            me: {
+                resource: 'me',
+                params: {
+                    fields: 'id',
+                },
+            },
+        },
+        evaluate: async (data) => {
+            try {
+                const response = await fetch(
+                    `${window.location.origin}/api/me`,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                    }
+                )
+
+                const coopHeader = response.headers.get('cross-origin-opener-policy')
+
+                if (coopHeader) {
+                    // Check the value of COOP
+                    const normalizedValue = coopHeader.toLowerCase().trim()
+
+                    if (normalizedValue === 'same-origin') {
+                        return {
+                            status: 'pass',
+                            message: 'COOP header is properly configured with same-origin',
+                            details: `Cross-Origin-Opener-Policy: ${coopHeader}. This provides the strongest isolation.`,
+                        }
+                    } else if (normalizedValue === 'same-origin-allow-popups') {
+                        return {
+                            status: 'pass',
+                            message: 'COOP header is configured with same-origin-allow-popups',
+                            details: `Cross-Origin-Opener-Policy: ${coopHeader}. This provides good isolation while allowing popups.`,
+                        }
+                    } else if (normalizedValue === 'unsafe-none') {
+                        return {
+                            status: 'warning',
+                            message: 'COOP header is set to unsafe-none',
+                            details: `Cross-Origin-Opener-Policy: ${coopHeader}. Consider using "same-origin" or "same-origin-allow-popups" for better security.`,
+                        }
+                    } else {
+                        return {
+                            status: 'warning',
+                            message: `COOP header has unexpected value: ${coopHeader}`,
+                            details: 'Valid values are: same-origin, same-origin-allow-popups, or unsafe-none.',
+                        }
+                    }
+                } else {
+                    return {
+                        status: 'warning',
+                        message: 'COOP header is not present',
+                        details: 'The Cross-Origin-Opener-Policy header is not configured. This header helps protect against cross-origin attacks by isolating the browsing context. Consider adding: "Cross-Origin-Opener-Policy: same-origin".',
+                    }
+                }
+            } catch (error) {
+                return {
+                    status: 'error',
+                    message: 'Unable to check COOP header',
+                    details: `Error checking COOP header: ${error.message}. This may be due to CORS restrictions.`,
+                }
+            }
+        },
+    },
+    {
+        id: 'coep-header',
+        title: 'Cross-Origin-Embedder-Policy (COEP)',
+        description: 'Checking for COEP header to control resource loading',
+        ranking: 0,
+        query: {
+            me: {
+                resource: 'me',
+                params: {
+                    fields: 'id',
+                },
+            },
+        },
+        evaluate: async (data) => {
+            try {
+                const response = await fetch(
+                    `${window.location.origin}/api/me`,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                    }
+                )
+
+                const coepHeader = response.headers.get('cross-origin-embedder-policy')
+
+                if (coepHeader) {
+                    const normalizedValue = coepHeader.toLowerCase().trim()
+
+                    if (normalizedValue === 'require-corp') {
+                        return {
+                            status: 'pass',
+                            message: 'COEP header is properly configured with require-corp',
+                            details: `Cross-Origin-Embedder-Policy: ${coepHeader}. This ensures all resources are explicitly marked for cross-origin loading.`,
+                        }
+                    } else if (normalizedValue === 'credentialless') {
+                        return {
+                            status: 'pass',
+                            message: 'COEP header is configured with credentialless',
+                            details: `Cross-Origin-Embedder-Policy: ${coepHeader}. This loads cross-origin resources without credentials.`,
+                        }
+                    } else if (normalizedValue === 'unsafe-none') {
+                        return {
+                            status: 'warning',
+                            message: 'COEP header is set to unsafe-none',
+                            details: `Cross-Origin-Embedder-Policy: ${coepHeader}. Consider using "require-corp" for better security.`,
+                        }
+                    } else {
+                        return {
+                            status: 'warning',
+                            message: `COEP header has unexpected value: ${coepHeader}`,
+                            details: 'Valid values are: require-corp, credentialless, or unsafe-none.',
+                        }
+                    }
+                } else {
+                    return {
+                        status: 'warning',
+                        message: 'COEP header is not present',
+                        details: 'The Cross-Origin-Embedder-Policy header is not configured. This header, combined with COOP, enables cross-origin isolation and provides access to powerful features. Consider adding: "Cross-Origin-Embedder-Policy: require-corp".',
+                    }
+                }
+            } catch (error) {
+                return {
+                    status: 'error',
+                    message: 'Unable to check COEP header',
+                    details: `Error checking COEP header: ${error.message}. This may be due to CORS restrictions.`,
+                }
+            }
+        },
+    },
+    {
+        id: 'corp-header',
+        title: 'Cross-Origin-Resource-Policy (CORP)',
+        description: 'Checking for CORP header to control resource embedding',
+        ranking: 0,
+        query: {
+            me: {
+                resource: 'me',
+                params: {
+                    fields: 'id',
+                },
+            },
+        },
+        evaluate: async (data) => {
+            try {
+                const response = await fetch(
+                    `${window.location.origin}/api/me`,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                    }
+                )
+
+                const corpHeader = response.headers.get('cross-origin-resource-policy')
+
+                if (corpHeader) {
+                    const normalizedValue = corpHeader.toLowerCase().trim()
+
+                    if (normalizedValue === 'same-origin') {
+                        return {
+                            status: 'pass',
+                            message: 'CORP header is configured with same-origin',
+                            details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can only be loaded from the same origin.`,
+                        }
+                    } else if (normalizedValue === 'same-site') {
+                        return {
+                            status: 'pass',
+                            message: 'CORP header is configured with same-site',
+                            details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can be loaded from the same site.`,
+                        }
+                    } else if (normalizedValue === 'cross-origin') {
+                        return {
+                            status: 'warning',
+                            message: 'CORP header is set to cross-origin',
+                            details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can be loaded from any origin. Consider using "same-origin" or "same-site" for better security.`,
+                        }
+                    } else {
+                        return {
+                            status: 'warning',
+                            message: `CORP header has unexpected value: ${corpHeader}`,
+                            details: 'Valid values are: same-origin, same-site, or cross-origin.',
+                        }
+                    }
+                } else {
+                    return {
+                        status: 'warning',
+                        message: 'CORP header is not present',
+                        details: 'The Cross-Origin-Resource-Policy header is not configured. This header protects resources from being loaded by other origins. Consider adding: "Cross-Origin-Resource-Policy: same-origin".',
+                    }
+                }
+            } catch (error) {
+                return {
+                    status: 'error',
+                    message: 'Unable to check CORP header',
+                    details: `Error checking CORP header: ${error.message}. This may be due to CORS restrictions.`,
                 }
             }
         },
