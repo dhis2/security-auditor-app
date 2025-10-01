@@ -1,0 +1,92 @@
+.card {
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.header {
+    margin-bottom: 24px;
+}
+
+.title {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #212934;
+}
+
+.subtitle {
+    margin: 0;
+    font-size: 14px;
+    color: #757575;
+}
+
+.infoGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.infoItem {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #757575;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0;
+}
+
+.value {
+    font-size: 14px;
+    color: #212934;
+    font-weight: 500;
+    margin: 0;
+    word-break: break-word;
+}
+
+.sectionHeader {
+    margin-top: 32px;
+    margin-bottom: 16px;
+    padding-top: 24px;
+    border-top: 1px solid #e8e8e8;
+}
+
+.sectionTitle {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #212934;
+}
+
+.envVars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.envItem {
+    display: flex;
+    gap: 16px;
+    padding: 12px;
+    background-color: #f9fafb;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.envKey {
+    font-weight: 600;
+    color: #212934;
+    min-width: 200px;
+}
+
+.envValue {
+    color: #616161;
+    word-break: break-all;
+}

@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
 
-// Security check definitions
-const securityChecks = [
+// Security check definitions (config will be passed in)
+const getSecurityChecks = (config) => [
     {
         id: 'user-roles',
         title: 'User Roles Configuration',
@@ -21,13 +21,14 @@ const securityChecks = [
             const superUsers = data.userRoles.userRoles.filter((role) =>
                 role.authorities.includes('ALL')
             )
-            const hasIssue = superUsers.length > 5
+            const maxAllowed = config.maxSuperUserRoles || 5
+            const hasIssue = superUsers.length > maxAllowed
 
             return {
                 status: hasIssue ? 'warning' : 'pass',
                 message: hasIssue
-                    ? `Found ${superUsers.length} user roles with ALL authorities. Consider limiting super user access.`
-                    : `User roles configured appropriately (${superUsers.length} super user roles).`,
+                    ? `Found ${superUsers.length} user roles with ALL authorities. Consider limiting super user access (max: ${maxAllowed}).`
+                    : `User roles configured appropriately (${superUsers.length} super user roles, max: ${maxAllowed}).`,
                 details: hasIssue
                     ? superUsers.map((role) => role.name).join(', ')
                     : null,
@@ -148,7 +149,7 @@ const securityChecks = [
     },
     {
         id: 'users-inactive-3-months',
-        title: 'Inactive User Accounts (3+ Months)',
+        title: 'Inactive User Accounts',
         description: 'Checking for accounts with no recent activity',
         ranking: 0,
         query: {
@@ -163,15 +164,16 @@ const securityChecks = [
         },
         evaluate: (data) => {
             const users = data.users.users
-            const threeMonthsAgo = new Date()
-            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+            const maxMonths = config.maxInactiveMonths || 3
+            const thresholdDate = new Date()
+            thresholdDate.setMonth(thresholdDate.getMonth() - maxMonths)
 
             const inactiveUsers = users.filter((user) => {
                 if (!user.lastLogin || user.lastLogin === '') {
                     return false // Exclude users who never logged in (handled by other check)
                 }
                 const lastLogin = new Date(user.lastLogin)
-                return lastLogin < threeMonthsAgo
+                return lastLogin < thresholdDate
             })
 
             const hasIssue = inactiveUsers.length > 0
@@ -179,8 +181,8 @@ const securityChecks = [
             return {
                 status: hasIssue ? 'warning' : 'pass',
                 message: hasIssue
-                    ? `Found ${inactiveUsers.length} users who haven't logged in for 3+ months`
-                    : 'All users with login history have recent activity',
+                    ? `Found ${inactiveUsers.length} users who haven't logged in for ${maxMonths}+ months`
+                    : `All users with login history have recent activity (within ${maxMonths} months)`,
                 details: hasIssue
                     ? `Consider disabling inactive accounts: ${inactiveUsers.slice(0, 5).map((u) => u.username).join(', ')}${inactiveUsers.length > 5 ? ` and ${inactiveUsers.length - 5} more` : ''}`
                     : null,
@@ -204,8 +206,9 @@ const securityChecks = [
         },
         evaluate: (data) => {
             const users = data.users.users
-            const oneYearAgo = new Date()
-            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+            const maxAgeDays = config.maxPasswordAgeDays || 365
+            const thresholdDate = new Date()
+            thresholdDate.setDate(thresholdDate.getDate() - maxAgeDays)
 
             const stalePasswords = users.filter((user) => {
                 const passwordLastUpdated =
@@ -214,7 +217,7 @@ const securityChecks = [
                     return true // Never changed
                 }
                 const lastUpdated = new Date(passwordLastUpdated)
-                return lastUpdated < oneYearAgo
+                return lastUpdated < thresholdDate
             })
 
             const hasIssue = stalePasswords.length > 0
@@ -222,8 +225,8 @@ const securityChecks = [
             return {
                 status: hasIssue ? 'warning' : 'pass',
                 message: hasIssue
-                    ? `Found ${stalePasswords.length} users with passwords older than 1 year or never changed`
-                    : 'All user passwords are up to date',
+                    ? `Found ${stalePasswords.length} users with passwords older than ${maxAgeDays} days or never changed`
+                    : `All user passwords are up to date (within ${maxAgeDays} days)`,
                 details: hasIssue
                     ? `Users with stale passwords: ${stalePasswords.slice(0, 5).map((u) => u.username).join(', ')}${stalePasswords.length > 5 ? ` and ${stalePasswords.length - 5} more` : ''}`
                     : null,
@@ -248,15 +251,16 @@ const securityChecks = [
                 data.settings?.minPasswordLength || 0,
                 10
             )
-            const hasIssue = minPasswordLength < 8
+            const requiredLength = config.minPasswordLength || 8
+            const hasIssue = minPasswordLength < requiredLength
 
             return {
                 status: hasIssue ? 'warning' : 'pass',
                 message: hasIssue
-                    ? `Minimum password length is ${minPasswordLength} characters - consider increasing to at least 8`
-                    : `Minimum password length is properly configured (${minPasswordLength} characters)`,
+                    ? `Minimum password length is ${minPasswordLength} characters - should be at least ${requiredLength}`
+                    : `Minimum password length is properly configured (${minPasswordLength} characters, required: ${requiredLength})`,
                 details: hasIssue
-                    ? 'Weak passwords increase the risk of unauthorized access. Set minPasswordLength to at least 8.'
+                    ? `Weak passwords increase the risk of unauthorized access. Set minPasswordLength to at least ${requiredLength}.`
                     : null,
             }
         },
@@ -552,15 +556,18 @@ const securityChecks = [
     },
 ]
 
-export const useSecurityAudit = () => {
+export const useSecurityAudit = (config = {}) => {
     const engine = useDataEngine()
     const [auditStatus, setAuditStatus] = useState('idle') // idle, running, completed, error
     const [findings, setFindings] = useState([])
     const [progress, setProgress] = useState({ current: 0, total: 0 })
 
-    const runAudit = useCallback(async () => {
+    const runAudit = useCallback(async (overrideConfig) => {
         setAuditStatus('running')
         setFindings([])
+
+        const configToUse = overrideConfig || config
+        const securityChecks = getSecurityChecks(configToUse)
         setProgress({ current: 0, total: securityChecks.length })
 
         try {
@@ -638,7 +645,7 @@ export const useSecurityAudit = () => {
             setAuditStatus('error')
             console.error('Audit error:', error)
         }
-    }, [engine])
+    }, [engine, config])
 
     return {
         auditStatus,

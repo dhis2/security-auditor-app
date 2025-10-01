@@ -1,14 +1,26 @@
-import React from 'react'
-import { Button, Card } from '@dhis2/ui'
+import React, { useState } from 'react'
+import { Button, Card, Tab, TabBar } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { useSecurityAudit } from '../hooks/useSecurityAudit'
+import { useAuditConfig } from '../hooks/useAuditConfig'
 import { AuditFindings } from './AuditFindings'
+import { ConfigurationPanel } from './ConfigurationPanel'
+import { SystemInfo } from './SystemInfo'
 import classes from './SecurityAuditor.module.css'
 
 export const SecurityAuditor = () => {
-    const { auditStatus, findings, progress, runAudit } = useSecurityAudit()
+    const { config, reloadConfig } = useAuditConfig()
+    const { auditStatus, findings, progress, runAudit } = useSecurityAudit(config)
+    const [activeTab, setActiveTab] = useState('audit')
 
     const isRunning = auditStatus === 'running'
+
+    const handleStartAudit = async () => {
+        // Reload configuration before starting audit to ensure latest settings are used
+        const freshConfig = await reloadConfig()
+        // Pass the fresh config directly to runAudit to avoid stale closure issues
+        runAudit(freshConfig)
+    }
 
     return (
         <div className={classes.container}>
@@ -27,7 +39,7 @@ export const SecurityAuditor = () => {
                     <Button
                         primary
                         large
-                        onClick={runAudit}
+                        onClick={handleStartAudit}
                         disabled={isRunning}
                     >
                         {isRunning
@@ -37,11 +49,38 @@ export const SecurityAuditor = () => {
                 </div>
             </Card>
 
-            <AuditFindings
-                findings={findings}
-                auditStatus={auditStatus}
-                progress={progress}
-            />
+            <TabBar className={classes.tabs}>
+                <Tab
+                    selected={activeTab === 'audit'}
+                    onClick={() => setActiveTab('audit')}
+                >
+                    {i18n.t('Audit Results')}
+                </Tab>
+                <Tab
+                    selected={activeTab === 'config'}
+                    onClick={() => setActiveTab('config')}
+                >
+                    {i18n.t('Configuration')}
+                </Tab>
+                <Tab
+                    selected={activeTab === 'systeminfo'}
+                    onClick={() => setActiveTab('systeminfo')}
+                >
+                    {i18n.t('System Info')}
+                </Tab>
+            </TabBar>
+
+            {activeTab === 'audit' && (
+                <AuditFindings
+                    findings={findings}
+                    auditStatus={auditStatus}
+                    progress={progress}
+                />
+            )}
+
+            {activeTab === 'config' && <ConfigurationPanel />}
+
+            {activeTab === 'systeminfo' && <SystemInfo />}
         </div>
     )
 }

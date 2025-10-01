@@ -75,3 +75,9 @@
     font-style: italic;
     margin-top: 4px;
 }
+
+.reportButton {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+}

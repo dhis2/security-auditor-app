@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-10-01T05:51:11.233Z\n"
-"PO-Revision-Date: 2025-10-01T05:51:11.233Z\n"
+"POT-Creation-Date: 2025-10-01T08:00:32.973Z\n"
+"PO-Revision-Date: 2025-10-01T08:00:32.973Z\n"
 
 msgid "Pass"
 msgstr "Pass"
@@ -65,6 +65,93 @@ msgstr "Status"
 msgid "Result"
 msgstr "Result"
 
+msgid "Generating..."
+msgstr "Generating..."
+
+msgid "Save Report"
+msgstr "Save Report"
+
+msgid "Configuration saved successfully"
+msgstr "Configuration saved successfully"
+
+msgid "Failed to save configuration"
+msgstr "Failed to save configuration"
+
+msgid "Configuration reset to defaults"
+msgstr "Configuration reset to defaults"
+
+msgid "Failed to reset configuration"
+msgstr "Failed to reset configuration"
+
+msgid "Configuration exported successfully"
+msgstr "Configuration exported successfully"
+
+msgid "Failed to export configuration"
+msgstr "Failed to export configuration"
+
+msgid "Configuration imported successfully"
+msgstr "Configuration imported successfully"
+
+msgid "Failed to save imported configuration"
+msgstr "Failed to save imported configuration"
+
+msgid "Failed to import configuration"
+msgstr "Failed to import configuration"
+
+msgid "Security Audit Configuration"
+msgstr "Security Audit Configuration"
+
+msgid "Configure thresholds and parameters for security checks"
+msgstr "Configure thresholds and parameters for security checks"
+
+msgid "Success"
+msgstr "Success"
+
+msgid "Minimum Password Length"
+msgstr "Minimum Password Length"
+
+msgid "Minimum number of characters required for passwords"
+msgstr "Minimum number of characters required for passwords"
+
+msgid "Maximum Inactive Months"
+msgstr "Maximum Inactive Months"
+
+msgid "Flag accounts inactive for more than this many months"
+msgstr "Flag accounts inactive for more than this many months"
+
+msgid "Maximum Password Age (Days)"
+msgstr "Maximum Password Age (Days)"
+
+msgid "Flag passwords older than this many days"
+msgstr "Flag passwords older than this many days"
+
+msgid "Maximum Super User Roles"
+msgstr "Maximum Super User Roles"
+
+msgid "Maximum number of user roles with ALL authorities before warning"
+msgstr "Maximum number of user roles with ALL authorities before warning"
+
+msgid "Saving..."
+msgstr "Saving..."
+
+msgid "Save Configuration"
+msgstr "Save Configuration"
+
+msgid "Reset to Defaults"
+msgstr "Reset to Defaults"
+
+msgid "Import and Export"
+msgstr "Import and Export"
+
+msgid "Export configuration as JSON file or import from a saved file"
+msgstr "Export configuration as JSON file or import from a saved file"
+
+msgid "Export Configuration"
+msgstr "Export Configuration"
+
+msgid "Import Configuration"
+msgstr "Import Configuration"
+
 msgid "Security Auditor"
 msgstr "Security Auditor"
 
@@ -81,10 +168,68 @@ msgstr "Auditing..."
 msgid "Start Audit"
 msgstr "Start Audit"
 
-msgctxt "Application title"
-msgid "__MANIFEST_APP_TITLE"
-msgstr "Security Auditor"
+msgid "Audit Results"
+msgstr "Audit Results"
 
-msgctxt "Application description"
-msgid "__MANIFEST_APP_DESCRIPTION"
-msgstr "DHIS2 Security Auditor"
+msgid "Configuration"
+msgstr "Configuration"
+
+msgid "System Info"
+msgstr "System Info"
+
+msgid "Failed to load system information"
+msgstr "Failed to load system information"
+
+msgid "DHIS2 Version"
+msgstr "DHIS2 Version"
+
+msgid "N/A"
+msgstr "N/A"
+
+msgid "DHIS2 Build Revision"
+msgstr "DHIS2 Build Revision"
+
+msgid "Build Time"
+msgstr "Build Time"
+
+msgid "Operating System"
+msgstr "Operating System"
+
+msgid "OS Architecture"
+msgstr "OS Architecture"
+
+msgid "OS Version"
+msgstr "OS Version"
+
+msgid "Java Version"
+msgstr "Java Version"
+
+msgid "Java Vendor"
+msgstr "Java Vendor"
+
+msgid "Java VM Name"
+msgstr "Java VM Name"
+
+msgid "Servlet Container"
+msgstr "Servlet Container"
+
+msgid "Database Name"
+msgstr "Database Name"
+
+msgid "Database User"
+msgstr "Database User"
+
+msgid "CPU Cores"
+msgstr "CPU Cores"
+
+msgid "Memory"
+msgstr "Memory"
+
+msgid "System Uptime"
+msgstr "System Uptime"
+
+msgid "System Information"
+msgstr "System Information"
+
+msgid "Information about the DHIS2 instance and server environment"
+msgstr "Information about the DHIS2 instance and server environment"

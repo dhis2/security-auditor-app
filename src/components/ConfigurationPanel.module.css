@@ -1,0 +1,34 @@
+.card {
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.header {
+    margin-bottom: 24px;
+}
+
+.title {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #212934;
+}
+
+.subtitle {
+    margin: 0;
+    font-size: 14px;
+    color: #757575;
+}
+
+.configGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin: 24px 0;
+}
+
+.actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 24px;
+}
