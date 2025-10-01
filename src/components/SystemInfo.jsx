@@ -62,7 +62,7 @@ export const SystemInfo = () => {
         },
         {
             label: i18n.t('Server URL'),
-            value: window.location.origin,
+            value: systemInfo.instanceBaseUrl || window.location.origin,
         },
         {
             label: i18n.t('System ID'),
@@ -117,8 +117,16 @@ export const SystemInfo = () => {
             value: systemInfo.databaseInfo?.name || i18n.t('N/A'),
         },
         {
+            label: i18n.t('Database Version'),
+            value: systemInfo.databaseInfo?.databaseVersion || i18n.t('N/A'),
+        },
+        {
             label: i18n.t('Database User'),
             value: systemInfo.databaseInfo?.user || i18n.t('N/A'),
+        },
+        {
+            label: i18n.t('External Directory'),
+            value: systemInfo.externalDirectory || i18n.t('N/A'),
         },
         {
             label: i18n.t('CPU Cores'),
@@ -128,7 +136,13 @@ export const SystemInfo = () => {
             label: i18n.t('Memory'),
             value: systemInfo.memoryInfo
                 ? typeof systemInfo.memoryInfo === 'string'
-                    ? systemInfo.memoryInfo
+                    ? (() => {
+                          // Extract numbers from string like "Mem Total in JVM: 4096 Free in JVM: 2620 Max Limit: 4096"
+                          const numbers = systemInfo.memoryInfo.match(/\d+/g)
+                          return numbers && numbers.length >= 3
+                              ? `${numbers[0]}/${numbers[1]}/${numbers[2]}`
+                              : systemInfo.memoryInfo
+                      })()
                     : `${Math.round(systemInfo.memoryInfo / 1024 / 1024)} MB`
                 : i18n.t('N/A'),
         },

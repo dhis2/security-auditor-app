@@ -203,7 +203,7 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
         </div>
         <div class="info-item">
             <div class="info-label">Server URL</div>
-            <div class="info-value">${window.location.origin}</div>
+            <div class="info-value">${systemInfo.instanceBaseUrl || window.location.origin}</div>
         </div>
         <div class="info-item">
             <div class="info-label">System ID</div>
@@ -236,6 +236,14 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
         <div class="info-item">
             <div class="info-label">Database</div>
             <div class="info-value">${systemInfo.databaseInfo?.name || 'N/A'}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Database Version</div>
+            <div class="info-value">${systemInfo.databaseInfo?.databaseVersion || 'N/A'}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">External Directory</div>
+            <div class="info-value">${systemInfo.externalDirectory || 'N/A'}</div>
         </div>
     </div>
 

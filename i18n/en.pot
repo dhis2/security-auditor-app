@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-10-01T10:40:38.901Z\n"
-"PO-Revision-Date: 2025-10-01T10:40:38.901Z\n"
+"POT-Creation-Date: 2025-10-01T11:49:32.927Z\n"
+"PO-Revision-Date: 2025-10-01T11:49:32.927Z\n"
 
 msgid "Pass"
 msgstr "Pass"
@@ -249,8 +249,14 @@ msgstr "Web Server"
 msgid "Database Name"
 msgstr "Database Name"
 
+msgid "Database Version"
+msgstr "Database Version"
+
 msgid "Database User"
 msgstr "Database User"
+
+msgid "External Directory"
+msgstr "External Directory"
 
 msgid "CPU Cores"
 msgstr "CPU Cores"
@@ -266,3 +272,131 @@ msgstr "System Information"
 
 msgid "Information about the DHIS2 instance and server environment"
 msgstr "Information about the DHIS2 instance and server environment"
+
+msgid "Users With ALL Authority"
+msgstr "Users With ALL Authority"
+
+msgid "Checking for users with administrative privileges"
+msgstr "Checking for users with administrative privileges"
+
+msgid "Users Who Can Manage Routes"
+msgstr "Users Who Can Manage Routes"
+
+msgid "Checking for users with route management privileges"
+msgstr "Checking for users with route management privileges"
+
+msgid "Default Allowed Routes"
+msgstr "Default Allowed Routes"
+
+msgid "Checking for SSRF vulnerabilities in route configuration"
+msgstr "Checking for SSRF vulnerabilities in route configuration"
+
+msgid "CORS Whitelist Configuration"
+msgstr "CORS Whitelist Configuration"
+
+msgid "Checking CORS whitelist configuration"
+msgstr "Checking CORS whitelist configuration"
+
+msgid "Users Never Logged In"
+msgstr "Users Never Logged In"
+
+msgid "Checking for active accounts that have never been used"
+msgstr "Checking for active accounts that have never been used"
+
+msgid "Inactive User Accounts"
+msgstr "Inactive User Accounts"
+
+msgid "Checking for accounts with no recent activity"
+msgstr "Checking for accounts with no recent activity"
+
+msgid "Password Age Verification"
+msgstr "Password Age Verification"
+
+msgid "Checking for stale or unchanged passwords"
+msgstr "Checking for stale or unchanged passwords"
+
+msgid "Password Policy Configuration"
+msgstr "Password Policy Configuration"
+
+msgid "Verifying minimum password length requirements"
+msgstr "Verifying minimum password length requirements"
+
+msgid "Password Expiry Policy"
+msgstr "Password Expiry Policy"
+
+msgid "Checking if forced password changes are enabled"
+msgstr "Checking if forced password changes are enabled"
+
+msgid "Email Verification Enforcement"
+msgstr "Email Verification Enforcement"
+
+msgid "Checking if email verification is enforced"
+msgstr "Checking if email verification is enforced"
+
+msgid "HTTPS Connection Security"
+msgstr "HTTPS Connection Security"
+
+msgid "Verifying secure connection to the server"
+msgstr "Verifying secure connection to the server"
+
+msgid "Default Admin Password Check"
+msgstr "Default Admin Password Check"
+
+msgid "Checking if admin account uses default password"
+msgstr "Checking if admin account uses default password"
+
+msgid "Account Lockout Policy"
+msgstr "Account Lockout Policy"
+
+msgid "Checking if account lockout after failed login attempts is enabled"
+msgstr "Checking if account lockout after failed login attempts is enabled"
+
+msgid "HTTP Strict Transport Security (HSTS)"
+msgstr "HTTP Strict Transport Security (HSTS)"
+
+msgid "Checking for HSTS header to enforce HTTPS"
+msgstr "Checking for HSTS header to enforce HTTPS"
+
+msgid "Server Header Exposure"
+msgstr "Server Header Exposure"
+
+msgid "Checking if server version information is exposed"
+msgstr "Checking if server version information is exposed"
+
+msgid "Cross-Origin-Opener-Policy (COOP)"
+msgstr "Cross-Origin-Opener-Policy (COOP)"
+
+msgid "Checking for COOP header to isolate browsing context"
+msgstr "Checking for COOP header to isolate browsing context"
+
+msgid "Cross-Origin-Embedder-Policy (COEP)"
+msgstr "Cross-Origin-Embedder-Policy (COEP)"
+
+msgid "Checking for COEP header to control resource loading"
+msgstr "Checking for COEP header to control resource loading"
+
+msgid "Cross-Origin-Resource-Policy (CORP)"
+msgstr "Cross-Origin-Resource-Policy (CORP)"
+
+msgid "Checking for CORP header to control resource embedding"
+msgstr "Checking for CORP header to control resource embedding"
+
+msgid "CORS Headers Configuration"
+msgstr "CORS Headers Configuration"
+
+msgid "Checking Access-Control-Allow-Origin and credentials configuration"
+msgstr "Checking Access-Control-Allow-Origin and credentials configuration"
+
+msgid "Content Security Policy (CSP)"
+msgstr "Content Security Policy (CSP)"
+
+msgid "Checking for CSP header and violations"
+msgstr "Checking for CSP header and violations"
+
+msgctxt "Application title"
+msgid "__MANIFEST_APP_TITLE"
+msgstr "Security Auditor"
+
+msgctxt "Application description"
+msgid "__MANIFEST_APP_DESCRIPTION"
+msgstr "DHIS2 Security Auditor"

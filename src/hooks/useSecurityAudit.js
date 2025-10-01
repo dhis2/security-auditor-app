@@ -1,44 +1,206 @@
 import { useState, useCallback } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
+import i18n from '@dhis2/d2-i18n'
 
 // Security check definitions (config will be passed in)
 const getSecurityChecks = (config) => [
     {
         id: 'user-roles',
-        title: 'User Roles Configuration',
-        description: 'Checking for users with excessive privileges',
+        title: i18n.t('Users With ALL Authority'),
+        description: i18n.t('Checking for users with administrative privileges'),
         ranking: 0,
         query: {
             userRoles: {
                 resource: 'userRoles',
                 params: {
-                    fields: 'id,name,users,authorities',
+                    fields: 'id,name,users[id,username],authorities',
                     paging: false,
                 },
             },
         },
         evaluate: (data) => {
-            const superUsers = data.userRoles.userRoles.filter((role) =>
+            // Find all roles with ALL authority
+            const rolesWithAll = data.userRoles.userRoles.filter((role) =>
                 role.authorities.includes('ALL')
             )
+
+            // Collect all unique users who have ANY role with ALL authority
+            const usersWithAllAuthority = new Map()
+            rolesWithAll.forEach((role) => {
+                if (role.users && Array.isArray(role.users)) {
+                    role.users.forEach((user) => {
+                        if (!usersWithAllAuthority.has(user.id)) {
+                            usersWithAllAuthority.set(user.id, {
+                                username: user.username || user.id,
+                                roles: [],
+                            })
+                        }
+                        usersWithAllAuthority.get(user.id).roles.push(role.name)
+                    })
+                }
+            })
+
+            const totalUsersWithAll = usersWithAllAuthority.size
             const maxAllowed = config.maxSuperUserRoles || 5
-            const hasIssue = superUsers.length > maxAllowed
+            const hasIssue = totalUsersWithAll > maxAllowed
+
+            // Build details message
+            let details = null
+            if (totalUsersWithAll > 0) {
+                const usersList = Array.from(usersWithAllAuthority.values())
+                    .map((info) => `${info.username} (${info.roles.join(', ')})`)
+                    .join('; ')
+                details = `Users with ALL authority: ${usersList}`
+            }
 
             return {
                 status: hasIssue ? 'warning' : 'pass',
                 message: hasIssue
-                    ? `Found ${superUsers.length} user roles with ALL authorities. Consider limiting super user access (max: ${maxAllowed}).`
-                    : `User roles configured appropriately (${superUsers.length} super user roles, max: ${maxAllowed}).`,
-                details: hasIssue
-                    ? superUsers.map((role) => role.name).join(', ')
-                    : null,
+                    ? `Found ${totalUsersWithAll} users with ALL authority. Consider limiting super user access (max: ${maxAllowed}).`
+                    : totalUsersWithAll > 0
+                    ? `Users with ALL authority: ${totalUsersWithAll} (max: ${maxAllowed}).`
+                    : 'No users with ALL authority found.',
+                details: details,
             }
         },
     },
     {
+        id: 'route-manager-authority',
+        title: i18n.t('Users Who Can Manage Routes'),
+        description: i18n.t('Checking for users with route management privileges'),
+        ranking: 0,
+        query: {
+            userRoles: {
+                resource: 'userRoles',
+                params: {
+                    fields: 'id,name,users[id,username],authorities',
+                    paging: false,
+                },
+            },
+        },
+        evaluate: (data) => {
+            // Find all roles with M_routemanager authority
+            const rolesWithRouteManager = data.userRoles.userRoles.filter((role) =>
+                role.authorities.includes('M_routemanager')
+            )
+
+            // Collect all unique users who have ANY role with M_routemanager authority
+            const usersWithRouteManager = new Map()
+            rolesWithRouteManager.forEach((role) => {
+                if (role.users && Array.isArray(role.users)) {
+                    role.users.forEach((user) => {
+                        if (!usersWithRouteManager.has(user.id)) {
+                            usersWithRouteManager.set(user.id, {
+                                username: user.username || user.id,
+                                roles: [],
+                            })
+                        }
+                        usersWithRouteManager.get(user.id).roles.push(role.name)
+                    })
+                }
+            })
+
+            const totalUsersWithRouteManager = usersWithRouteManager.size
+            const maxAllowed = config.maxSuperUserRoles || 5
+            const hasIssue = totalUsersWithRouteManager > maxAllowed
+
+            // Build details message
+            let details = null
+            if (totalUsersWithRouteManager > 0) {
+                const usersList = Array.from(usersWithRouteManager.values())
+                    .map((info) => `${info.username} (${info.roles.join(', ')})`)
+                    .join('; ')
+                details = `Users with M_routemanager authority: ${usersList}`
+            }
+
+            return {
+                status: hasIssue ? 'warning' : 'pass',
+                message: hasIssue
+                    ? `Found ${totalUsersWithRouteManager} users with M_routemanager authority. Consider limiting route management access (max: ${maxAllowed}).`
+                    : totalUsersWithRouteManager > 0
+                    ? `Users with M_routemanager authority: ${totalUsersWithRouteManager} (max: ${maxAllowed}).`
+                    : 'No users with M_routemanager authority found.',
+                details: details,
+            }
+        },
+    },
+    // {
+    //     id: 'default-allowed-routes',
+    //     title: i18n.t('Default Allowed Routes'),
+    //     description: i18n.t('Checking for SSRF vulnerabilities in route configuration'),
+    //     ranking: 0,
+    //     query: {
+    //         settings: {
+    //             resource: 'systemSettings',
+    //             params: {
+    //                 key: ['keyDefaultBaseUrl'],
+    //             },
+    //         },
+    //     },
+    //     evaluate: (data) => {
+    //         const defaultBaseUrl = data.settings?.keyDefaultBaseUrl || ''
+
+    //         // Check if it's the dangerous default value
+    //         if (defaultBaseUrl === 'https://*') {
+    //             return {
+    //                 status: 'fail',
+    //                 message: 'Default allowed route is set to https://* - critical SSRF vulnerability!',
+    //                 details: 'Default allowed route URL https://* is vulnerable to server-side request forgery (SSRF) attacks. You should further restrict the default allowed route URL such that it contains no wildcards.',
+    //             }
+    //         }
+
+    //         // Check if empty (safe)
+    //         if (!defaultBaseUrl || defaultBaseUrl.trim() === '') {
+    //             return {
+    //                 status: 'pass',
+    //                 message: 'Default allowed route is empty',
+    //                 details: 'No default allowed route configured, which is safe.',
+    //             }
+    //         }
+
+    //         // Check if it has wildcards in the path
+    //         // Format: protocol://domain/path
+    //         const hasWildcard = defaultBaseUrl.includes('*')
+
+    //         if (hasWildcard) {
+    //             // Check if wildcard is only in domain (like https://*.example.com) or also in path
+    //             const urlParts = defaultBaseUrl.split('://')
+    //             if (urlParts.length === 2) {
+    //                 const afterProtocol = urlParts[1]
+    //                 const pathStartIndex = afterProtocol.indexOf('/')
+
+    //                 if (pathStartIndex > -1) {
+    //                     const pathPart = afterProtocol.substring(pathStartIndex)
+    //                     if (pathPart.includes('*')) {
+    //                         return {
+    //                             status: 'warning',
+    //                             message: 'Default allowed route contains wildcards in path',
+    //                             details: `Route: ${defaultBaseUrl}. Wildcards in the path increase SSRF risk. Consider restricting to specific URLs without wildcards.`,
+    //                         }
+    //                     }
+    //                 }
+
+    //                 // Wildcard only in domain
+    //                 return {
+    //                     status: 'warning',
+    //                     message: 'Default allowed route contains wildcards in domain',
+    //                     details: `Route: ${defaultBaseUrl}. While restricted by domain, wildcards still pose some SSRF risk. Consider using specific URLs.`,
+    //                 }
+    //             }
+    //         }
+
+    //         // No wildcards - safe
+    //         return {
+    //             status: 'pass',
+    //             message: 'Default allowed route is properly configured',
+    //             details: `Route: ${defaultBaseUrl}. No wildcards detected.`,
+    //         }
+    //     },
+    // },
+    {
         id: 'cors-whitelist',
-        title: 'CORS Configuration',
-        description: 'Checking CORS whitelist configuration',
+        title: i18n.t('CORS Whitelist Configuration'),
+        description: i18n.t('Checking CORS whitelist configuration'),
         ranking: 0,
         query: {
             corsWhitelist: {
@@ -75,8 +237,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'users-never-logged-in',
-        title: 'Users Never Logged In',
-        description: 'Checking for active accounts that have never been used',
+        title: i18n.t('Users Never Logged In'),
+        description: i18n.t('Checking for active accounts that have never been used'),
         ranking: 0,
         query: {
             users: {
@@ -109,8 +271,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'users-inactive-3-months',
-        title: 'Inactive User Accounts',
-        description: 'Checking for accounts with no recent activity',
+        title: i18n.t('Inactive User Accounts'),
+        description: i18n.t('Checking for accounts with no recent activity'),
         ranking: 0,
         query: {
             users: {
@@ -151,8 +313,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'password-age',
-        title: 'Password Age Verification',
-        description: 'Checking for stale or unchanged passwords',
+        title: i18n.t('Password Age Verification'),
+        description: i18n.t('Checking for stale or unchanged passwords'),
         ranking: 0,
         query: {
             users: {
@@ -195,8 +357,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'password-policy',
-        title: 'Password Policy Configuration',
-        description: 'Verifying minimum password length requirements',
+        title: i18n.t('Password Policy Configuration'),
+        description: i18n.t('Verifying minimum password length requirements'),
         ranking: 0,
         query: {
             settings: {
@@ -227,8 +389,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'password-expiry-policy',
-        title: 'Password Expiry Policy',
-        description: 'Checking if forced password changes are enabled',
+        title: i18n.t('Password Expiry Policy'),
+        description: i18n.t('Checking if forced password changes are enabled'),
         ranking: 0,
         query: {
             settings: {
@@ -257,8 +419,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'email-verification',
-        title: 'Email Verification Enforcement',
-        description: 'Checking if email verification is enforced',
+        title: i18n.t('Email Verification Enforcement'),
+        description: i18n.t('Checking if email verification is enforced'),
         ranking: 0,
         query: {
             settings: {
@@ -286,8 +448,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'https-connection',
-        title: 'HTTPS Connection Security',
-        description: 'Verifying secure connection to the server',
+        title: i18n.t('HTTPS Connection Security'),
+        description: i18n.t('Verifying secure connection to the server'),
         ranking: 0,
         query: {
             // Dummy query to trigger the check
@@ -315,8 +477,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'default-admin-password',
-        title: 'Default Admin Password Check',
-        description: 'Checking if admin account uses default password',
+        title: i18n.t('Default Admin Password Check'),
+        description: i18n.t('Checking if admin account uses default password'),
         ranking: 10,
         query: {
             adminUser: {
@@ -356,8 +518,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'account-lockout',
-        title: 'Account Lockout Policy',
-        description: 'Checking if account lockout after failed login attempts is enabled',
+        title: i18n.t('Account Lockout Policy'),
+        description: i18n.t('Checking if account lockout after failed login attempts is enabled'),
         ranking: 0,
         query: {
             settings: {
@@ -385,8 +547,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'hsts-header',
-        title: 'HTTP Strict Transport Security (HSTS)',
-        description: 'Checking for HSTS header to enforce HTTPS',
+        title: i18n.t('HTTP Strict Transport Security (HSTS)'),
+        description: i18n.t('Checking for HSTS header to enforce HTTPS'),
         ranking: 0,
         query: {
             // We need to make an async check, so use a dummy query
@@ -437,8 +599,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'server-header-exposure',
-        title: 'Server Header Exposure',
-        description: 'Checking if server version information is exposed',
+        title: i18n.t('Server Header Exposure'),
+        description: i18n.t('Checking if server version information is exposed'),
         ranking: 0,
         query: {
             me: {
@@ -484,8 +646,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'coop-header',
-        title: 'Cross-Origin-Opener-Policy (COOP)',
-        description: 'Checking for COOP header to isolate browsing context',
+        title: i18n.t('Cross-Origin-Opener-Policy (COOP)'),
+        description: i18n.t('Checking for COOP header to isolate browsing context'),
         ranking: 0,
         query: {
             me: {
@@ -554,8 +716,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'coep-header',
-        title: 'Cross-Origin-Embedder-Policy (COEP)',
-        description: 'Checking for COEP header to control resource loading',
+        title: i18n.t('Cross-Origin-Embedder-Policy (COEP)'),
+        description: i18n.t('Checking for COEP header to control resource loading'),
         ranking: 0,
         query: {
             me: {
@@ -623,8 +785,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'corp-header',
-        title: 'Cross-Origin-Resource-Policy (CORP)',
-        description: 'Checking for CORP header to control resource embedding',
+        title: i18n.t('Cross-Origin-Resource-Policy (CORP)'),
+        description: i18n.t('Checking for CORP header to control resource embedding'),
         ranking: 0,
         query: {
             me: {
@@ -692,8 +854,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'cors-headers',
-        title: 'CORS Headers Configuration',
-        description: 'Checking Access-Control-Allow-Origin and credentials configuration',
+        title: i18n.t('CORS Headers Configuration'),
+        description: i18n.t('Checking Access-Control-Allow-Origin and credentials configuration'),
         ranking: 0,
         query: {
             me: {
@@ -765,8 +927,8 @@ const getSecurityChecks = (config) => [
     },
     {
         id: 'csp-header',
-        title: 'Content Security Policy (CSP)',
-        description: 'Checking for CSP header and violations',
+        title: i18n.t('Content Security Policy (CSP)'),
+        description: i18n.t('Checking for CSP header and violations'),
         ranking: 0,
         query: {
             me: {
