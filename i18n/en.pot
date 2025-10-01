@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-10-01T11:49:32.927Z\n"
-"PO-Revision-Date: 2025-10-01T11:49:32.927Z\n"
+"POT-Creation-Date: 2025-10-01T19:15:37.385Z\n"
+"PO-Revision-Date: 2025-10-01T19:15:37.385Z\n"
 
 msgid "Pass"
 msgstr "Pass"
@@ -291,6 +291,18 @@ msgstr "Default Allowed Routes"
 msgid "Checking for SSRF vulnerabilities in route configuration"
 msgstr "Checking for SSRF vulnerabilities in route configuration"
 
+msgid "Users Who Can Impersonate Others"
+msgstr "Users Who Can Impersonate Others"
+
+msgid "Checking for users with impersonation privileges"
+msgstr "Checking for users with impersonation privileges"
+
+msgid "Users Who Can Change System Settings"
+msgstr "Users Who Can Change System Settings"
+
+msgid "Checking for users with system settings modification privileges"
+msgstr "Checking for users with system settings modification privileges"
+
 msgid "CORS Whitelist Configuration"
 msgstr "CORS Whitelist Configuration"
 
@@ -392,11 +404,3 @@ msgstr "Content Security Policy (CSP)"
 
 msgid "Checking for CSP header and violations"
 msgstr "Checking for CSP header and violations"
-
-msgctxt "Application title"
-msgid "__MANIFEST_APP_TITLE"
-msgstr "Security Auditor"
-
-msgctxt "Application description"
-msgid "__MANIFEST_APP_DESCRIPTION"
-msgstr "DHIS2 Security Auditor"

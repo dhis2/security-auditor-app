@@ -73,11 +73,15 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
         setGenerating(true)
 
         try {
+            const systemInfo = systemInfoData?.systemInfo || {}
+
             // Fetch web server info
             let serverHeader = 'Unable to detect'
             try {
+                const contextPath = systemInfo.contextPath
+                const apiUrl = contextPath ? `${contextPath}/api/me` : '../api/me'
                 const response = await fetch(
-                    `${window.location.origin}/api/me`,
+                    apiUrl,
                     {
                         method: 'GET',
                         credentials: 'include',
@@ -87,8 +91,6 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
             } catch (error) {
                 serverHeader = 'Unable to detect'
             }
-
-            const systemInfo = systemInfoData?.systemInfo || {}
             const reportDate = new Date().toLocaleString()
             const appVersion = '1.0.0' // Version from package.json
 

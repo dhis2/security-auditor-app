@@ -2,6 +2,16 @@ import { useState, useCallback } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
 
+// Helper function to get the base URL for fetch requests
+const getApiUrl = (contextPath) => {
+    if (contextPath) {
+        // contextPath already includes the full URL like https://security.dhis2.thetechaid.org/dhis
+        return `${contextPath}/api/me`
+    }
+    // Fallback to relative URL
+    return '../api/me'
+}
+
 // Security check definitions (config will be passed in)
 const getSecurityChecks = (config) => [
     {
@@ -197,6 +207,126 @@ const getSecurityChecks = (config) => [
     //         }
     //     },
     // },
+    {
+        id: 'impersonate-user-authority',
+        title: i18n.t('Users Who Can Impersonate Others'),
+        description: i18n.t('Checking for users with impersonation privileges'),
+        ranking: 0,
+        query: {
+            userRoles: {
+                resource: 'userRoles',
+                params: {
+                    fields: 'id,name,users[id,username],authorities',
+                    paging: false,
+                },
+            },
+        },
+        evaluate: (data) => {
+            // Find all roles with F_IMPERSONATE_USER authority
+            const rolesWithImpersonate = data.userRoles.userRoles.filter((role) =>
+                role.authorities.includes('F_IMPERSONATE_USER')
+            )
+
+            // Collect all unique users who have ANY role with F_IMPERSONATE_USER authority
+            const usersWithImpersonate = new Map()
+            rolesWithImpersonate.forEach((role) => {
+                if (role.users && Array.isArray(role.users)) {
+                    role.users.forEach((user) => {
+                        if (!usersWithImpersonate.has(user.id)) {
+                            usersWithImpersonate.set(user.id, {
+                                username: user.username || user.id,
+                                roles: [],
+                            })
+                        }
+                        usersWithImpersonate.get(user.id).roles.push(role.name)
+                    })
+                }
+            })
+
+            const totalUsersWithImpersonate = usersWithImpersonate.size
+            const maxAllowed = 5
+            const hasIssue = totalUsersWithImpersonate > maxAllowed
+
+            // Build details message
+            let details = null
+            if (totalUsersWithImpersonate > 0) {
+                const usersList = Array.from(usersWithImpersonate.values())
+                    .map((info) => `${info.username} (${info.roles.join(', ')})`)
+                    .join('; ')
+                details = `Users with F_IMPERSONATE_USER authority: ${usersList}`
+            }
+
+            return {
+                status: hasIssue ? 'warning' : 'pass',
+                message: hasIssue
+                    ? `Found ${totalUsersWithImpersonate} users with F_IMPERSONATE_USER authority. Consider limiting impersonation access (max: ${maxAllowed}).`
+                    : totalUsersWithImpersonate > 0
+                    ? `Users with F_IMPERSONATE_USER authority: ${totalUsersWithImpersonate} (max: ${maxAllowed}).`
+                    : 'No users with F_IMPERSONATE_USER authority found.',
+                details: details,
+            }
+        },
+    },
+    {
+        id: 'system-setting-authority',
+        title: i18n.t('Users Who Can Change System Settings'),
+        description: i18n.t('Checking for users with system settings modification privileges'),
+        ranking: 0,
+        query: {
+            userRoles: {
+                resource: 'userRoles',
+                params: {
+                    fields: 'id,name,users[id,username],authorities',
+                    paging: false,
+                },
+            },
+        },
+        evaluate: (data) => {
+            // Find all roles with F_SYSTEM_SETTING authority
+            const rolesWithSystemSetting = data.userRoles.userRoles.filter((role) =>
+                role.authorities.includes('F_SYSTEM_SETTING')
+            )
+
+            // Collect all unique users who have ANY role with F_SYSTEM_SETTING authority
+            const usersWithSystemSetting = new Map()
+            rolesWithSystemSetting.forEach((role) => {
+                if (role.users && Array.isArray(role.users)) {
+                    role.users.forEach((user) => {
+                        if (!usersWithSystemSetting.has(user.id)) {
+                            usersWithSystemSetting.set(user.id, {
+                                username: user.username || user.id,
+                                roles: [],
+                            })
+                        }
+                        usersWithSystemSetting.get(user.id).roles.push(role.name)
+                    })
+                }
+            })
+
+            const totalUsersWithSystemSetting = usersWithSystemSetting.size
+            const maxAllowed = 5
+            const hasIssue = totalUsersWithSystemSetting > maxAllowed
+
+            // Build details message
+            let details = null
+            if (totalUsersWithSystemSetting > 0) {
+                const usersList = Array.from(usersWithSystemSetting.values())
+                    .map((info) => `${info.username} (${info.roles.join(', ')})`)
+                    .join('; ')
+                details = `Users with F_SYSTEM_SETTING authority: ${usersList}`
+            }
+
+            return {
+                status: hasIssue ? 'warning' : 'pass',
+                message: hasIssue
+                    ? `Found ${totalUsersWithSystemSetting} users with F_SYSTEM_SETTING authority. Consider limiting system settings access (max: ${maxAllowed}).`
+                    : totalUsersWithSystemSetting > 0
+                    ? `Users with F_SYSTEM_SETTING authority: ${totalUsersWithSystemSetting} (max: ${maxAllowed}).`
+                    : 'No users with F_SYSTEM_SETTING authority found.',
+                details: details,
+            }
+        },
+    },
     {
         id: 'cors-whitelist',
         title: i18n.t('CORS Whitelist Configuration'),
@@ -551,19 +681,19 @@ const getSecurityChecks = (config) => [
         description: i18n.t('Checking for HSTS header to enforce HTTPS'),
         ranking: 0,
         query: {
-            // We need to make an async check, so use a dummy query
-            me: {
-                resource: 'me',
+            systemInfo: {
+                resource: 'system/info',
                 params: {
-                    fields: 'id',
+                    fields: 'contextPath',
                 },
             },
         },
         evaluate: async (data) => {
             try {
+                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
                 // Make a fetch request to check response headers
                 const response = await fetch(
-                    `${window.location.origin}/api/me`,
+                    apiUrl,
                     {
                         method: 'GET',
                         credentials: 'include',
@@ -603,17 +733,18 @@ const getSecurityChecks = (config) => [
         description: i18n.t('Checking if server version information is exposed'),
         ranking: 0,
         query: {
-            me: {
-                resource: 'me',
+            systemInfo: {
+                resource: 'system/info',
                 params: {
-                    fields: 'id',
+                    fields: 'contextPath',
                 },
             },
         },
         evaluate: async (data) => {
             try {
+                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
                 const response = await fetch(
-                    `${window.location.origin}/api/me`,
+                    apiUrl,
                     {
                         method: 'GET',
                         credentials: 'include',
@@ -650,17 +781,18 @@ const getSecurityChecks = (config) => [
         description: i18n.t('Checking for COOP header to isolate browsing context'),
         ranking: 0,
         query: {
-            me: {
-                resource: 'me',
+            systemInfo: {
+                resource: 'system/info',
                 params: {
-                    fields: 'id',
+                    fields: 'contextPath',
                 },
             },
         },
         evaluate: async (data) => {
             try {
+                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
                 const response = await fetch(
-                    `${window.location.origin}/api/me`,
+                    apiUrl,
                     {
                         method: 'GET',
                         credentials: 'include',
@@ -720,17 +852,18 @@ const getSecurityChecks = (config) => [
         description: i18n.t('Checking for COEP header to control resource loading'),
         ranking: 0,
         query: {
-            me: {
-                resource: 'me',
+            systemInfo: {
+                resource: 'system/info',
                 params: {
-                    fields: 'id',
+                    fields: 'contextPath',
                 },
             },
         },
         evaluate: async (data) => {
             try {
+                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
                 const response = await fetch(
-                    `${window.location.origin}/api/me`,
+                    apiUrl,
                     {
                         method: 'GET',
                         credentials: 'include',
@@ -789,17 +922,18 @@ const getSecurityChecks = (config) => [
         description: i18n.t('Checking for CORP header to control resource embedding'),
         ranking: 0,
         query: {
-            me: {
-                resource: 'me',
+            systemInfo: {
+                resource: 'system/info',
                 params: {
-                    fields: 'id',
+                    fields: 'contextPath',
                 },
             },
         },
         evaluate: async (data) => {
             try {
+                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
                 const response = await fetch(
-                    `${window.location.origin}/api/me`,
+                    apiUrl,
                     {
                         method: 'GET',
                         credentials: 'include',
@@ -858,17 +992,18 @@ const getSecurityChecks = (config) => [
         description: i18n.t('Checking Access-Control-Allow-Origin and credentials configuration'),
         ranking: 0,
         query: {
-            me: {
-                resource: 'me',
+            systemInfo: {
+                resource: 'system/info',
                 params: {
-                    fields: 'id',
+                    fields: 'contextPath',
                 },
             },
         },
         evaluate: async (data) => {
             try {
+                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
                 const response = await fetch(
-                    `${window.location.origin}/api/me`,
+                    apiUrl,
                     {
                         method: 'GET',
                         credentials: 'include',
@@ -931,18 +1066,19 @@ const getSecurityChecks = (config) => [
         description: i18n.t('Checking for CSP header and violations'),
         ranking: 0,
         query: {
-            me: {
-                resource: 'me',
+            systemInfo: {
+                resource: 'system/info',
                 params: {
-                    fields: 'id',
+                    fields: 'contextPath',
                 },
             },
         },
         evaluate: async (data) => {
             try {
+                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
                 // Make a fetch request to check response headers
                 const response = await fetch(
-                    `${window.location.origin}/api/me`,
+                    apiUrl,
                     {
                         method: 'GET',
                         credentials: 'include',

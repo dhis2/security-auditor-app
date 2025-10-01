@@ -17,8 +17,10 @@ export const SystemInfo = () => {
     useEffect(() => {
         const fetchWebServerInfo = async () => {
             try {
+                const contextPath = data?.systemInfo?.contextPath
+                const apiUrl = contextPath ? `${contextPath}/api/me` : '../api/me'
                 const response = await fetch(
-                    `${window.location.origin}/api/me`,
+                    apiUrl,
                     {
                         method: 'GET',
                         credentials: 'include',
@@ -31,8 +33,10 @@ export const SystemInfo = () => {
             }
         }
 
-        fetchWebServerInfo()
-    }, [])
+        if (data?.systemInfo) {
+            fetchWebServerInfo()
+        }
+    }, [data])
 
     if (loading) {
         return (
