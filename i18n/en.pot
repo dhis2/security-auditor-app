@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-10-01T19:15:37.385Z\n"
-"PO-Revision-Date: 2025-10-01T19:15:37.385Z\n"
+"POT-Creation-Date: 2025-10-01T19:18:10.981Z\n"
+"PO-Revision-Date: 2025-10-01T19:18:10.981Z\n"
 
 msgid "Pass"
 msgstr "Pass"
@@ -404,3 +404,11 @@ msgstr "Content Security Policy (CSP)"
 
 msgid "Checking for CSP header and violations"
 msgstr "Checking for CSP header and violations"
+
+msgctxt "Application title"
+msgid "__MANIFEST_APP_TITLE"
+msgstr "Security Auditor"
+
+msgctxt "Application description"
+msgid "__MANIFEST_APP_DESCRIPTION"
+msgstr "DHIS2 Security Auditor"
