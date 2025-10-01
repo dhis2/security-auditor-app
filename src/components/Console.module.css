@@ -1,0 +1,82 @@
+.card {
+    margin: 16px 0;
+}
+
+.header {
+    padding: 16px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.title {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: #212934;
+}
+
+.subtitle {
+    margin: 0;
+    font-size: 14px;
+    color: #4a5768;
+}
+
+.consoleContent {
+    padding: 16px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.emptyState {
+    padding: 40px;
+    text-align: center;
+    color: #6b7280;
+}
+
+.emptyState p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.responseBlock {
+    margin-bottom: 24px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.responseHeader {
+    background-color: #f5f5f5;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.checkId {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #2c5aa0;
+    font-weight: 600;
+    padding: 4px 8px;
+    background-color: #e3f2fd;
+    border-radius: 3px;
+}
+
+.checkTitle {
+    font-size: 14px;
+    font-weight: 500;
+    color: #212934;
+}
+
+.jsonContent {
+    margin: 0;
+    padding: 16px;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+}

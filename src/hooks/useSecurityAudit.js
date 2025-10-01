@@ -691,6 +691,79 @@ const getSecurityChecks = (config) => [
         },
     },
     {
+        id: 'cors-headers',
+        title: 'CORS Headers Configuration',
+        description: 'Checking Access-Control-Allow-Origin and credentials configuration',
+        ranking: 0,
+        query: {
+            me: {
+                resource: 'me',
+                params: {
+                    fields: 'id',
+                },
+            },
+        },
+        evaluate: async (data) => {
+            try {
+                const response = await fetch(
+                    `${window.location.origin}/api/me`,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                    }
+                )
+
+                const allowOrigin = response.headers.get('access-control-allow-origin')
+                const allowCredentials = response.headers.get('access-control-allow-credentials')
+
+                // Check for dangerous combinations
+                if (allowOrigin === '*' && allowCredentials === 'true') {
+                    return {
+                        status: 'fail',
+                        message: 'Dangerous CORS configuration detected',
+                        details: 'Access-Control-Allow-Origin is set to wildcard (*) with Access-Control-Allow-Credentials: true. This is a critical security vulnerability that allows any origin to make authenticated requests. Change Access-Control-Allow-Origin to specific trusted origins.',
+                    }
+                }
+
+                if (allowOrigin === '*') {
+                    return {
+                        status: 'warning',
+                        message: 'CORS allows all origins',
+                        details: 'Access-Control-Allow-Origin: *. This allows any website to make requests to your API. Consider restricting to specific trusted origins unless this is intentional for a public API.',
+                    }
+                }
+
+                if (allowOrigin && allowCredentials === 'true') {
+                    return {
+                        status: 'warning',
+                        message: 'CORS allows credentials from specific origin',
+                        details: `Access-Control-Allow-Origin: ${allowOrigin}, Access-Control-Allow-Credentials: true. Ensure this origin is trusted as it can make authenticated requests.`,
+                    }
+                }
+
+                if (allowOrigin) {
+                    return {
+                        status: 'pass',
+                        message: 'CORS configured with specific origin',
+                        details: `Access-Control-Allow-Origin: ${allowOrigin}${allowCredentials ? `, Access-Control-Allow-Credentials: ${allowCredentials}` : ''}`,
+                    }
+                }
+
+                return {
+                    status: 'pass',
+                    message: 'No CORS headers present',
+                    details: 'Access-Control-Allow-Origin header is not set. This is appropriate if cross-origin requests are not needed.',
+                }
+            } catch (error) {
+                return {
+                    status: 'error',
+                    message: 'Unable to check CORS headers',
+                    details: `Error checking CORS headers: ${error.message}`,
+                }
+            }
+        },
+    },
+    {
         id: 'csp-header',
         title: 'Content Security Policy (CSP)',
         description: 'Checking for CSP header and violations',
@@ -776,10 +849,12 @@ export const useSecurityAudit = (config = {}) => {
     const [auditStatus, setAuditStatus] = useState('idle') // idle, running, completed, error
     const [findings, setFindings] = useState([])
     const [progress, setProgress] = useState({ current: 0, total: 0 })
+    const [apiResponses, setApiResponses] = useState([])
 
     const runAudit = useCallback(async (overrideConfig) => {
         setAuditStatus('running')
         setFindings([])
+        setApiResponses([])
 
         const configToUse = overrideConfig || config
         const securityChecks = getSecurityChecks(configToUse)
@@ -806,6 +881,16 @@ export const useSecurityAudit = (config = {}) => {
                 try {
                     // Execute the query
                     const data = await engine.query(check.query)
+
+                    // Store API response for console
+                    setApiResponses((prev) => [
+                        ...prev,
+                        {
+                            checkId: check.id,
+                            checkTitle: check.title,
+                            data: data,
+                        },
+                    ])
 
                     // Evaluate the result (handle both sync and async evaluate functions)
                     const result = await Promise.resolve(check.evaluate(data))
@@ -867,5 +952,6 @@ export const useSecurityAudit = (config = {}) => {
         findings,
         progress,
         runAudit,
+        apiResponses,
     }
 }

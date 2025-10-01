@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-10-01T09:29:56.212Z\n"
-"PO-Revision-Date: 2025-10-01T09:29:56.212Z\n"
+"POT-Creation-Date: 2025-10-01T10:40:38.901Z\n"
+"PO-Revision-Date: 2025-10-01T10:40:38.901Z\n"
 
 msgid "Pass"
 msgstr "Pass"
@@ -152,6 +152,15 @@ msgstr "Export Configuration"
 msgid "Import Configuration"
 msgstr "Import Configuration"
 
+msgid "API Console"
+msgstr "API Console"
+
+msgid "Raw API responses from security audit checks"
+msgstr "Raw API responses from security audit checks"
+
+msgid "No API responses yet. Run an audit to see the data."
+msgstr "No API responses yet. Run an audit to see the data."
+
 msgid "Security Auditor"
 msgstr "Security Auditor"
 
@@ -176,6 +185,9 @@ msgstr "Configuration"
 
 msgid "System Info"
 msgstr "System Info"
+
+msgid "Console"
+msgstr "Console"
 
 msgid "Loading..."
 msgstr "Loading..."
@@ -254,11 +266,3 @@ msgstr "System Information"
 
 msgid "Information about the DHIS2 instance and server environment"
 msgstr "Information about the DHIS2 instance and server environment"
-
-msgctxt "Application title"
-msgid "__MANIFEST_APP_TITLE"
-msgstr "Security Auditor"
-
-msgctxt "Application description"
-msgid "__MANIFEST_APP_DESCRIPTION"
-msgstr "DHIS2 Security Auditor"
