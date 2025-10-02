@@ -5,8 +5,27 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-10-01T19:18:10.981Z\n"
-"PO-Revision-Date: 2025-10-01T19:18:10.981Z\n"
+"POT-Creation-Date: 2025-10-02T09:21:54.798Z\n"
+"PO-Revision-Date: 2025-10-02T09:21:54.798Z\n"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Failed to load user information"
+msgstr "Failed to load user information"
+
+msgid "Security Auditor"
+msgstr "Security Auditor"
+
+msgid "Administrator Access Required"
+msgstr "Administrator Access Required"
+
+msgid ""
+"This tool is available for administrators only. You need the ALL authority "
+"to access the Security Auditor."
+msgstr ""
+"This tool is available for administrators only. You need the ALL authority "
+"to access the Security Auditor."
 
 msgid "Pass"
 msgstr "Pass"
@@ -16,9 +35,6 @@ msgstr "Warning"
 
 msgid "Fail"
 msgstr "Fail"
-
-msgid "Error"
-msgstr "Error"
 
 msgid "Running"
 msgstr "Running"
@@ -160,9 +176,6 @@ msgstr "Raw API responses from security audit checks"
 
 msgid "No API responses yet. Run an audit to see the data."
 msgstr "No API responses yet. Run an audit to see the data."
-
-msgid "Security Auditor"
-msgstr "Security Auditor"
 
 msgid ""
 "Analyze your DHIS2 instance for security vulnerabilities and configuration "
