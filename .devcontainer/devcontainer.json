@@ -35,9 +35,6 @@
         "install-typescript-lsp": "npm install -g typescript-language-server || true",
         "install-yarn-and-d2": "yarn global add @dhis2/cli || true"
     },
-    "postStartCommand": {
-        "install-claude-plugins-typescript-lsp": "claude plugins install typescript-lsp || true"
-    },
     "customizations": {
         "vscode": {
             "extensions": [
