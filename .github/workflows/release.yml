@@ -53,11 +53,20 @@ jobs:
         run: yarn build
 
       - name: Commit and tag
+        uses: planetscale/ghcommit-action@v0.2.0
+        with:
+          commit_message: "chore: release v${{ steps.version.outputs.value }}"
+          repo: ${{ github.repository }}
+          branch: main
+          file_pattern: package.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag release
         run: |
-          git add package.json
-          git commit -m "chore: release v${{ steps.version.outputs.value }}"
-          git tag "v${{ steps.version.outputs.value }}"
-          git push origin main --follow-tags
+          git fetch origin main
+          git tag "v${{ steps.version.outputs.value }}" origin/main
+          git push origin "v${{ steps.version.outputs.value }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

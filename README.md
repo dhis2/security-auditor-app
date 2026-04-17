@@ -35,3 +35,38 @@ This command will prompt you to enter a server URL as well as the username and p
 You must run `yarn build` before running `yarn deploy`.<br />
 
 See the section about [deploying](https://platform.dhis2.nu/#/scripts/deploy) for more information.
+
+## Releasing a New Version
+
+Releases are created automatically when a PR is merged into `main` with a version label.
+
+1. Create a branch and make your changes
+   ```bash
+   git checkout -b my-feature-branch
+   # ... make changes ...
+   git add src/
+   git push -u origin my-feature-branch
+   ```
+
+2. Open a pull request against `main`
+   ```bash
+   gh pr create --title "My feature" --body ""
+   ```
+
+3. Add one of these labels to the PR:
+   - `patch` — bug fixes, minor tweaks (e.g. `1.0.0` → `1.0.1`)
+   - `minor` — new features, backwards-compatible (e.g. `1.0.0` → `1.1.0`)
+   - `major` — breaking changes (e.g. `1.0.0` → `2.0.0`)
+   ```bash
+   gh pr edit --add-label minor
+   ```
+
+4. Merge the PR and delete the branch
+   ```bash
+   gh pr merge --merge --delete-branch
+   ```
+
+The CI pipeline will automatically:
+- Bump the version in `package.json` and commit it to `main`
+- Build the app
+- Create a GitHub Release with the `.zip` artifact attached
