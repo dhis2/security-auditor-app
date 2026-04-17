@@ -1,0 +1,55 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+    "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+    "name": "security-auditor-ubuntu",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "args": {
+            "TZ": "${localEnv:TZ:Etc/UTC}",
+            "UBUNTU_MIRROR": "http://ftp.uni-stuttgart.de/ubuntu/"
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "20",
+            "nodeGypDependencies": true
+        },
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers-extra/features/npm-package:1": {}
+    },
+    "containerEnv": {
+        "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+        "NPM_CONFIG_IGNORE_SCRIPTS": "true",
+        "NPM_CONFIG_AUDIT": "false",
+        "NPM_CONFIG_FUND": "false",
+        "NPM_CONFIG_SAVE_EXACT": "true",
+        "NPM_CONFIG_UPDATE_NOTIFIER": "false"
+    },
+    "mounts": [
+        "source=claude-${devcontainerId},target=/home/vscode/.claude,type=volume",
+        "source=config-${devcontainerId},target=/home/vscode/.config,type=volume"
+    ],
+    "postCreateCommand": {
+        "install-claude": "curl -fsSL https://claude.ai/install.sh | bash",
+        "install-typescript-lsp": "npm install -g typescript-language-server || true",
+        "install-yarn-and-d2": "yarn global add @dhis2/cli || true"
+    },
+    "postStartCommand": {
+        "install-claude-plugins-typescript-lsp": "claude plugins install typescript-lsp || true"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "anthropic.claude-code",
+                "dbaeumer.vscode-eslint",
+                "eamodio.gitlens",
+                "esbenp.prettier-vscode"
+            ],
+            "settings": {
+                "claudeCode.allowDangerouslySkipPermissions": true,
+                "claudeCode.initialPermissionMode": "bypassPermissions"
+            }
+        }
+    }
+}
