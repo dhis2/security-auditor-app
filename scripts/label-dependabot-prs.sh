@@ -111,5 +111,7 @@ for entry in "${valid_prs[@]}"; do
   gh pr close "$number" --comment "Closing in favour of batch PR on branch '$BATCH_BRANCH'."
 done
 
+git checkout main
+
 echo ""
 echo "Done. Merge the '$BATCH_BRANCH' PR to trigger a $highest_label release."
