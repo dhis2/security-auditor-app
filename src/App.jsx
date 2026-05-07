@@ -1,7 +1,7 @@
 import React from 'react'
 import './locales'
 import { useDataQuery } from '@dhis2/app-runtime'
-import { NoticeBox, CircularLoader } from '@dhis2/ui'
+import { Card, NoticeBox, CircularLoader } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { SecurityAuditor } from './components/SecurityAuditor'
 
@@ -36,20 +36,24 @@ const MyApp = () => {
     }
 
     const authorities = data?.me?.authorities || []
-    const hasAllAuthority = authorities.includes('ALL')
+    const hasAccess = authorities.includes('ALL') || authorities.includes('F_SYSTEM_SETTING')
 
-    return (
-        <>
-            {!hasAllAuthority && (
-                <div style={{ padding: '20px 20px 0' }}>
-                    <NoticeBox warning title={i18n.t('Limited Access')}>
-                        {i18n.t('You do not have the ALL authority. Some audit checks may fail or return incomplete results, as the Security Auditor is designed for administrators with full access.')}
+    if (!hasAccess) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', padding: '20px' }}>
+                <Card style={{ maxWidth: '600px', padding: '40px', textAlign: 'center' }}>
+                    <h2 style={{ marginBottom: '20px', color: '#212934' }}>
+                        {i18n.t('Security Auditor')}
+                    </h2>
+                    <NoticeBox warning title={i18n.t('Administrator Access Required')}>
+                        {i18n.t('This tool is available for administrators only. You need the ALL or F_SYSTEM_SETTING authority to access the Security Auditor.')}
                     </NoticeBox>
-                </div>
-            )}
-            <SecurityAuditor />
-        </>
-    )
+                </Card>
+            </div>
+        )
+    }
+
+    return <SecurityAuditor />
 }
 
 export default MyApp
