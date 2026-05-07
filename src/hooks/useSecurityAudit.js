@@ -135,7 +135,8 @@ const summarizeAuthorityHolders = ({
 }
 
 // Security check definitions (config will be passed in)
-const getSecurityChecks = (config) => [
+// Exported for tests; the production hook keeps it private.
+export const getSecurityChecks = (config) => [
     {
         id: 'user-roles',
         title: i18n.t('Users With ALL Authority'),
