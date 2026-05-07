@@ -12,6 +12,23 @@ const getApiUrl = (contextPath) => {
     return '../api/me'
 }
 
+// Read passwordLastUpdated, falling back to the legacy nested path used pre-v42.
+const getPasswordLastUpdated = (user) =>
+    user?.passwordLastUpdated ?? user?.userCredentials?.passwordLastUpdated ?? null
+
+// True if two ISO timestamps are within `toleranceMs` of each other.
+const timestampsRoughlyEqual = (a, b, toleranceMs = 60_000) => {
+    if (!a || !b) {
+        return false
+    }
+    const diff = Math.abs(new Date(a).getTime() - new Date(b).getTime())
+    return Number.isFinite(diff) && diff <= toleranceMs
+}
+
+const is404 = (error) =>
+    error?.details?.httpStatusCode === 404 ||
+    /\b404\b/.test(error?.message || '')
+
 // Security check definitions (config will be passed in)
 const getSecurityChecks = (config) => [
     {
@@ -450,7 +467,7 @@ const getSecurityChecks = (config) => [
             users: {
                 resource: 'users',
                 params: {
-                    fields: 'id,username,disabled,userCredentials[passwordLastUpdated]',
+                    fields: 'id,username,disabled,passwordLastUpdated,userCredentials[passwordLastUpdated]',
                     paging: false,
                     filter: 'disabled:eq:false',
                 },
@@ -463,9 +480,8 @@ const getSecurityChecks = (config) => [
             thresholdDate.setDate(thresholdDate.getDate() - maxAgeDays)
 
             const stalePasswords = users.filter((user) => {
-                const passwordLastUpdated =
-                    user.userCredentials?.passwordLastUpdated
-                if (!passwordLastUpdated || passwordLastUpdated === '') {
+                const passwordLastUpdated = getPasswordLastUpdated(user)
+                if (!passwordLastUpdated) {
                     return true // Never changed
                 }
                 const lastUpdated = new Date(passwordLastUpdated)
@@ -575,6 +591,15 @@ const getSecurityChecks = (config) => [
                     : null,
             }
         },
+        // The `enforceVerifiedEmail` setting was introduced in DHIS2 v42.
+        onError: (error) =>
+            is404(error)
+                ? {
+                      status: 'warning',
+                      message: 'Email verification setting not available on this DHIS2 version',
+                      details: 'The enforceVerifiedEmail setting was introduced in DHIS2 v42. Upgrade to enable enforcement of verified email addresses.',
+                  }
+                : null,
     },
     {
         id: 'https-connection',
@@ -614,7 +639,7 @@ const getSecurityChecks = (config) => [
             adminUser: {
                 resource: 'users',
                 params: {
-                    fields: 'id,username,userCredentials[passwordLastUpdated]',
+                    fields: 'id,username,created,passwordLastUpdated,userCredentials[passwordLastUpdated]',
                     filter: 'username:eq:admin',
                 },
             },
@@ -630,18 +655,24 @@ const getSecurityChecks = (config) => [
             }
 
             const adminUser = users[0]
-            const passwordLastUpdated =
-                adminUser.userCredentials?.passwordLastUpdated
-            const hasDefaultPassword =
-                !passwordLastUpdated || passwordLastUpdated === ''
+            const passwordLastUpdated = getPasswordLastUpdated(adminUser)
+            const created = adminUser.created
+
+            // The DHIS2 API populates `passwordLastUpdated` at user creation,
+            // so an empty value alone is not a reliable signal. We additionally
+            // flag the case where it matches `created` (within 60s), which
+            // indicates the password has not been changed since the user was created.
+            const neverSet = !passwordLastUpdated
+            const matchesCreated = timestampsRoughlyEqual(passwordLastUpdated, created)
+            const hasDefaultPassword = neverSet || matchesCreated
 
             return {
                 status: hasDefaultPassword ? 'fail' : 'pass',
                 message: hasDefaultPassword
-                    ? 'Admin account is using default password!'
+                    ? 'Admin account password has not been changed since the account was created'
                     : 'Admin password has been changed',
                 details: hasDefaultPassword
-                    ? 'CRITICAL: The admin account password has never been changed. Change it immediately to prevent unauthorized access.'
+                    ? 'CRITICAL: The admin account password appears to be unchanged since user creation. If it is still the default ("district"), change it immediately to prevent unauthorized access.'
                     : null,
             }
         },
@@ -674,6 +705,16 @@ const getSecurityChecks = (config) => [
                     : null,
             }
         },
+        // The `lockMultipleFailedLogins` setting key is not exposed via
+        // /api/systemSettings on older DHIS2 versions (e.g. v41 returns 404).
+        onError: (error) =>
+            is404(error)
+                ? {
+                      status: 'warning',
+                      message: 'Account lockout setting not available on this DHIS2 version',
+                      details: 'The lockMultipleFailedLogins setting is not exposed via the API on this DHIS2 version. Upgrade to enable automated lockout after failed login attempts.',
+                  }
+                : null,
     },
     {
         id: 'hsts-header',
@@ -1220,15 +1261,23 @@ export const useSecurityAudit = (config = {}) => {
                         })
                     })
                 } catch (error) {
-                    // Handle individual check errors
+                    // Allow the check to translate certain errors (e.g. a 404
+                    // for a setting that doesn't exist on this DHIS2 version)
+                    // into a meaningful status instead of a generic error.
+                    const override = check.onError
+                        ? await Promise.resolve(check.onError(error))
+                        : null
+
                     setFindings((prev) =>
                         prev.map((finding) =>
                             finding.id === check.id
                                 ? {
                                       ...finding,
-                                      status: 'error',
-                                      message: `Error executing check: ${error.message}`,
-                                      details: null,
+                                      status: override?.status ?? 'error',
+                                      message:
+                                          override?.message ??
+                                          `Error executing check: ${error.message}`,
+                                      details: override?.details ?? null,
                                   }
                                 : finding
                         )

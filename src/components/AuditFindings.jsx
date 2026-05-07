@@ -14,6 +14,7 @@ import {
 } from '@dhis2/ui'
 import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
+import { version as appVersion } from '../../package.json'
 import classes from './AuditFindings.module.css'
 
 const systemInfoQuery = {
@@ -92,7 +93,6 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
                 serverHeader = 'Unable to detect'
             }
             const reportDate = new Date().toLocaleString()
-            const appVersion = '1.0.0' // Version from package.json
 
             // Create HTML content for the report
             let htmlContent = `
