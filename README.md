@@ -161,3 +161,4 @@ The CI pipeline will automatically:
 - Bump the version in `package.json` and commit it to `main`
 - Build the app
 - Create a GitHub Release with the `.zip` artifact attached
+

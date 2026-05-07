@@ -14,7 +14,7 @@ import {
 } from '@dhis2/ui'
 import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
-import { version as appVersion } from '../../package.json'
+import { APP_VERSION as appVersion } from '../version'
 import classes from './AuditFindings.module.css'
 
 const systemInfoQuery = {

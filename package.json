@@ -6,8 +6,8 @@
   "author": "Michael Markevich",
   "private": true,
   "scripts": {
-    "build": "d2-app-scripts build",
-    "start": "d2-app-scripts start",
+    "build": "node scripts/sync-version.js && d2-app-scripts build",
+    "start": "node scripts/sync-version.js && d2-app-scripts start",
     "test": "d2-app-scripts test",
     "deploy": "d2-app-scripts deploy"
   },
