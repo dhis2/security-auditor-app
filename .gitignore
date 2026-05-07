@@ -3,4 +3,5 @@ node_modules
 .claude
 .d2
 src/locales
+src/version.js
 build
