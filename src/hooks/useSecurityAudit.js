@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
+import { fetchAllPaged } from '../utils/pagination'
+import { parseDhis2Version, passwordLastUpdatedField } from '../utils/version'
 
 // Helper function to get the base URL for fetch requests
 const getApiUrl = (contextPath) => {
@@ -29,6 +31,95 @@ const is404 = (error) =>
     error?.details?.httpStatusCode === 404 ||
     /\b404\b/.test(error?.message || '')
 
+// Authorities pre-fetched as the audit's shared "privileged roles" set.
+const PRIVILEGED_AUTHORITIES = [
+    'ALL',
+    'F_PUBLIC_ROUTE_ADD',
+    'F_IMPERSONATE_USER',
+    'F_SYSTEM_SETTING',
+]
+
+// Fetch the users that hold a given authority via any of the prefetched roles.
+// Returns { users } for the evaluator, or { unavailable: true } if the shared
+// role list could not be obtained during prefetch.
+const fetchAuthorityHolders = async (engine, ctx, authority) => {
+    if (!ctx.privilegedRoles) {
+        return { unavailable: true, users: [] }
+    }
+    const matchingRoleIds = ctx.privilegedRoles
+        .filter((role) => (role.authorities || []).includes(authority))
+        .map((role) => role.id)
+    if (matchingRoleIds.length === 0) {
+        return { users: [] }
+    }
+    const users = await fetchAllPaged(engine, {
+        resource: 'users',
+        params: {
+            fields: 'id,username,userRoles[id,name]',
+            filter: `userRoles.id:in:[${matchingRoleIds.join(',')}]`,
+        },
+    })
+    return { users }
+}
+
+// Build the shared finding for an authority check.
+const summarizeAuthorityHolders = ({
+    data,
+    ctx,
+    authority,
+    authorityLabel,
+    contextLabel,
+    maxAllowed,
+}) => {
+    if (data.unavailable) {
+        return {
+            status: 'warning',
+            message: `Could not check ${authorityLabel} authority — privileged role data unavailable`,
+            details: 'The audit could not pre-fetch the list of roles with privileged authorities. The instance may be unreachable, or the user may lack permission to read userRoles.',
+        }
+    }
+
+    const matchingRoleIds = new Set(
+        ctx.privilegedRoles
+            .filter((role) => (role.authorities || []).includes(authority))
+            .map((role) => role.id)
+    )
+    const usersWithAuthority = new Map()
+    for (const user of data.users) {
+        const matchedRoles = (user.userRoles || []).filter((role) =>
+            matchingRoleIds.has(role.id)
+        )
+        if (matchedRoles.length === 0) {
+            continue
+        }
+        usersWithAuthority.set(user.id, {
+            username: user.username || user.id,
+            roles: matchedRoles.map((role) => role.name).filter(Boolean),
+        })
+    }
+
+    const total = usersWithAuthority.size
+    const hasIssue = total > maxAllowed
+
+    let details = null
+    if (total > 0) {
+        const usersList = Array.from(usersWithAuthority.values())
+            .map((info) => `${info.username} (${info.roles.join(', ')})`)
+            .join('; ')
+        details = `Users with ${authorityLabel} authority: ${usersList}`
+    }
+
+    return {
+        status: hasIssue ? 'warning' : 'pass',
+        message: hasIssue
+            ? `Found ${total} users with ${authorityLabel} authority. Consider limiting ${contextLabel} (max: ${maxAllowed}).`
+            : total > 0
+            ? `Users with ${authorityLabel} authority: ${total} (max: ${maxAllowed}).`
+            : `No users with ${authorityLabel} authority found.`,
+        details,
+    }
+}
+
 // Security check definitions (config will be passed in)
 const getSecurityChecks = (config) => [
     {
@@ -36,120 +127,32 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Users With ALL Authority'),
         description: i18n.t('Checking for users with administrative privileges'),
         ranking: 0,
-        query: {
-            userRoles: {
-                resource: 'userRoles',
-                params: {
-                    fields: 'id,name,users[id,username],authorities',
-                    paging: false,
-                },
-            },
-        },
-        evaluate: (data) => {
-            // Find all roles with ALL authority
-            const rolesWithAll = data.userRoles.userRoles.filter((role) =>
-                role.authorities.includes('ALL')
-            )
-
-            // Collect all unique users who have ANY role with ALL authority
-            const usersWithAllAuthority = new Map()
-            rolesWithAll.forEach((role) => {
-                if (role.users && Array.isArray(role.users)) {
-                    role.users.forEach((user) => {
-                        if (!usersWithAllAuthority.has(user.id)) {
-                            usersWithAllAuthority.set(user.id, {
-                                username: user.username || user.id,
-                                roles: [],
-                            })
-                        }
-                        usersWithAllAuthority.get(user.id).roles.push(role.name)
-                    })
-                }
-            })
-
-            const totalUsersWithAll = usersWithAllAuthority.size
-            const maxAllowed = config.maxSuperUserRoles || 5
-            const hasIssue = totalUsersWithAll > maxAllowed
-
-            // Build details message
-            let details = null
-            if (totalUsersWithAll > 0) {
-                const usersList = Array.from(usersWithAllAuthority.values())
-                    .map((info) => `${info.username} (${info.roles.join(', ')})`)
-                    .join('; ')
-                details = `Users with ALL authority: ${usersList}`
-            }
-
-            return {
-                status: hasIssue ? 'warning' : 'pass',
-                message: hasIssue
-                    ? `Found ${totalUsersWithAll} users with ALL authority. Consider limiting super user access (max: ${maxAllowed}).`
-                    : totalUsersWithAll > 0
-                    ? `Users with ALL authority: ${totalUsersWithAll} (max: ${maxAllowed}).`
-                    : 'No users with ALL authority found.',
-                details: details,
-            }
-        },
+        fetch: (engine, ctx) => fetchAuthorityHolders(engine, ctx, 'ALL'),
+        evaluate: (data, ctx) =>
+            summarizeAuthorityHolders({
+                data,
+                ctx,
+                authority: 'ALL',
+                authorityLabel: 'ALL',
+                contextLabel: 'super user access',
+                maxAllowed: config.maxSuperUserRoles || 5,
+            }),
     },
     {
         id: 'route-manager-authority',
-        title: i18n.t('Users Who Can Manage Routes'),
-        description: i18n.t('Checking for users with route management privileges'),
+        title: i18n.t('Users Who Can Add Public Routes'),
+        description: i18n.t('Checking for users with route creation privileges'),
         ranking: 0,
-        query: {
-            userRoles: {
-                resource: 'userRoles',
-                params: {
-                    fields: 'id,name,users[id,username],authorities',
-                    paging: false,
-                },
-            },
-        },
-        evaluate: (data) => {
-            // Find all roles with M_routemanager authority
-            const rolesWithRouteManager = data.userRoles.userRoles.filter((role) =>
-                role.authorities.includes('M_routemanager')
-            )
-
-            // Collect all unique users who have ANY role with M_routemanager authority
-            const usersWithRouteManager = new Map()
-            rolesWithRouteManager.forEach((role) => {
-                if (role.users && Array.isArray(role.users)) {
-                    role.users.forEach((user) => {
-                        if (!usersWithRouteManager.has(user.id)) {
-                            usersWithRouteManager.set(user.id, {
-                                username: user.username || user.id,
-                                roles: [],
-                            })
-                        }
-                        usersWithRouteManager.get(user.id).roles.push(role.name)
-                    })
-                }
-            })
-
-            const totalUsersWithRouteManager = usersWithRouteManager.size
-            const maxAllowed = config.maxSuperUserRoles || 5
-            const hasIssue = totalUsersWithRouteManager > maxAllowed
-
-            // Build details message
-            let details = null
-            if (totalUsersWithRouteManager > 0) {
-                const usersList = Array.from(usersWithRouteManager.values())
-                    .map((info) => `${info.username} (${info.roles.join(', ')})`)
-                    .join('; ')
-                details = `Users with M_routemanager authority: ${usersList}`
-            }
-
-            return {
-                status: hasIssue ? 'warning' : 'pass',
-                message: hasIssue
-                    ? `Found ${totalUsersWithRouteManager} users with M_routemanager authority. Consider limiting route management access (max: ${maxAllowed}).`
-                    : totalUsersWithRouteManager > 0
-                    ? `Users with M_routemanager authority: ${totalUsersWithRouteManager} (max: ${maxAllowed}).`
-                    : 'No users with M_routemanager authority found.',
-                details: details,
-            }
-        },
+        fetch: (engine, ctx) => fetchAuthorityHolders(engine, ctx, 'F_PUBLIC_ROUTE_ADD'),
+        evaluate: (data, ctx) =>
+            summarizeAuthorityHolders({
+                data,
+                ctx,
+                authority: 'F_PUBLIC_ROUTE_ADD',
+                authorityLabel: 'F_PUBLIC_ROUTE_ADD',
+                contextLabel: 'public route creation access',
+                maxAllowed: config.maxSuperUserRoles || 5,
+            }),
     },
     // {
     //     id: 'default-allowed-routes',
@@ -229,120 +232,32 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Users Who Can Impersonate Others'),
         description: i18n.t('Checking for users with impersonation privileges'),
         ranking: 0,
-        query: {
-            userRoles: {
-                resource: 'userRoles',
-                params: {
-                    fields: 'id,name,users[id,username],authorities',
-                    paging: false,
-                },
-            },
-        },
-        evaluate: (data) => {
-            // Find all roles with F_IMPERSONATE_USER authority
-            const rolesWithImpersonate = data.userRoles.userRoles.filter((role) =>
-                role.authorities.includes('F_IMPERSONATE_USER')
-            )
-
-            // Collect all unique users who have ANY role with F_IMPERSONATE_USER authority
-            const usersWithImpersonate = new Map()
-            rolesWithImpersonate.forEach((role) => {
-                if (role.users && Array.isArray(role.users)) {
-                    role.users.forEach((user) => {
-                        if (!usersWithImpersonate.has(user.id)) {
-                            usersWithImpersonate.set(user.id, {
-                                username: user.username || user.id,
-                                roles: [],
-                            })
-                        }
-                        usersWithImpersonate.get(user.id).roles.push(role.name)
-                    })
-                }
-            })
-
-            const totalUsersWithImpersonate = usersWithImpersonate.size
-            const maxAllowed = 5
-            const hasIssue = totalUsersWithImpersonate > maxAllowed
-
-            // Build details message
-            let details = null
-            if (totalUsersWithImpersonate > 0) {
-                const usersList = Array.from(usersWithImpersonate.values())
-                    .map((info) => `${info.username} (${info.roles.join(', ')})`)
-                    .join('; ')
-                details = `Users with F_IMPERSONATE_USER authority: ${usersList}`
-            }
-
-            return {
-                status: hasIssue ? 'warning' : 'pass',
-                message: hasIssue
-                    ? `Found ${totalUsersWithImpersonate} users with F_IMPERSONATE_USER authority. Consider limiting impersonation access (max: ${maxAllowed}).`
-                    : totalUsersWithImpersonate > 0
-                    ? `Users with F_IMPERSONATE_USER authority: ${totalUsersWithImpersonate} (max: ${maxAllowed}).`
-                    : 'No users with F_IMPERSONATE_USER authority found.',
-                details: details,
-            }
-        },
+        fetch: (engine, ctx) => fetchAuthorityHolders(engine, ctx, 'F_IMPERSONATE_USER'),
+        evaluate: (data, ctx) =>
+            summarizeAuthorityHolders({
+                data,
+                ctx,
+                authority: 'F_IMPERSONATE_USER',
+                authorityLabel: 'F_IMPERSONATE_USER',
+                contextLabel: 'impersonation access',
+                maxAllowed: 5,
+            }),
     },
     {
         id: 'system-setting-authority',
         title: i18n.t('Users Who Can Change System Settings'),
         description: i18n.t('Checking for users with system settings modification privileges'),
         ranking: 0,
-        query: {
-            userRoles: {
-                resource: 'userRoles',
-                params: {
-                    fields: 'id,name,users[id,username],authorities',
-                    paging: false,
-                },
-            },
-        },
-        evaluate: (data) => {
-            // Find all roles with F_SYSTEM_SETTING authority
-            const rolesWithSystemSetting = data.userRoles.userRoles.filter((role) =>
-                role.authorities.includes('F_SYSTEM_SETTING')
-            )
-
-            // Collect all unique users who have ANY role with F_SYSTEM_SETTING authority
-            const usersWithSystemSetting = new Map()
-            rolesWithSystemSetting.forEach((role) => {
-                if (role.users && Array.isArray(role.users)) {
-                    role.users.forEach((user) => {
-                        if (!usersWithSystemSetting.has(user.id)) {
-                            usersWithSystemSetting.set(user.id, {
-                                username: user.username || user.id,
-                                roles: [],
-                            })
-                        }
-                        usersWithSystemSetting.get(user.id).roles.push(role.name)
-                    })
-                }
-            })
-
-            const totalUsersWithSystemSetting = usersWithSystemSetting.size
-            const maxAllowed = 5
-            const hasIssue = totalUsersWithSystemSetting > maxAllowed
-
-            // Build details message
-            let details = null
-            if (totalUsersWithSystemSetting > 0) {
-                const usersList = Array.from(usersWithSystemSetting.values())
-                    .map((info) => `${info.username} (${info.roles.join(', ')})`)
-                    .join('; ')
-                details = `Users with F_SYSTEM_SETTING authority: ${usersList}`
-            }
-
-            return {
-                status: hasIssue ? 'warning' : 'pass',
-                message: hasIssue
-                    ? `Found ${totalUsersWithSystemSetting} users with F_SYSTEM_SETTING authority. Consider limiting system settings access (max: ${maxAllowed}).`
-                    : totalUsersWithSystemSetting > 0
-                    ? `Users with F_SYSTEM_SETTING authority: ${totalUsersWithSystemSetting} (max: ${maxAllowed}).`
-                    : 'No users with F_SYSTEM_SETTING authority found.',
-                details: details,
-            }
-        },
+        fetch: (engine, ctx) => fetchAuthorityHolders(engine, ctx, 'F_SYSTEM_SETTING'),
+        evaluate: (data, ctx) =>
+            summarizeAuthorityHolders({
+                data,
+                ctx,
+                authority: 'F_SYSTEM_SETTING',
+                authorityLabel: 'F_SYSTEM_SETTING',
+                contextLabel: 'system settings access',
+                maxAllowed: 5,
+            }),
     },
     {
         id: 'cors-whitelist',
@@ -387,31 +302,26 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Users Never Logged In'),
         description: i18n.t('Checking for active accounts that have never been used'),
         ranking: 0,
-        query: {
-            users: {
+        fetch: async (engine) => {
+            const users = await fetchAllPaged(engine, {
                 resource: 'users',
                 params: {
-                    fields: 'id,username,disabled,lastLogin,created',
-                    paging: false,
-                    filter: 'disabled:eq:false',
+                    fields: 'id,username',
+                    filter: ['disabled:eq:false', 'lastLogin:null'],
                 },
-            },
+            })
+            return { users }
         },
         evaluate: (data) => {
-            const users = data.users.users
-            const neverLoggedIn = users.filter(
-                (user) => !user.lastLogin || user.lastLogin === ''
-            )
-
-            const hasIssue = neverLoggedIn.length > 0
-
+            const users = data.users
+            const total = users.length
             return {
-                status: hasIssue ? 'warning' : 'pass',
-                message: hasIssue
-                    ? `Found ${neverLoggedIn.length} active accounts that have never logged in`
+                status: total > 0 ? 'warning' : 'pass',
+                message: total > 0
+                    ? `Found ${total} active accounts that have never logged in`
                     : 'All active users have logged in at least once',
-                details: hasIssue
-                    ? `Consider removing unused accounts: ${neverLoggedIn.slice(0, 5).map((u) => u.username).join(', ')}${neverLoggedIn.length > 5 ? ` and ${neverLoggedIn.length - 5} more` : ''}`
+                details: total > 0
+                    ? `Consider removing unused accounts: ${users.slice(0, 5).map((u) => u.username).join(', ')}${total > 5 ? ` and ${total - 5} more` : ''}`
                     : null,
             }
         },
@@ -421,39 +331,32 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Inactive User Accounts'),
         description: i18n.t('Checking for accounts with no recent activity'),
         ranking: 0,
-        query: {
-            users: {
+        fetch: async (engine) => {
+            const months = config.maxInactiveMonths || 3
+            const users = await fetchAllPaged(engine, {
                 resource: 'users',
                 params: {
-                    fields: 'id,username,disabled,lastLogin',
-                    paging: false,
+                    fields: 'id,username,lastLogin',
                     filter: 'disabled:eq:false',
+                    inactiveMonths: months,
                 },
-            },
+            })
+            // The inactiveMonths parameter on some DHIS2 versions also matches
+            // users with a null lastLogin; exclude them — they're surfaced by
+            // the dedicated "users never logged in" check.
+            return { users: users.filter((u) => u.lastLogin) }
         },
         evaluate: (data) => {
-            const users = data.users.users
             const maxMonths = config.maxInactiveMonths || 3
-            const thresholdDate = new Date()
-            thresholdDate.setMonth(thresholdDate.getMonth() - maxMonths)
-
-            const inactiveUsers = users.filter((user) => {
-                if (!user.lastLogin || user.lastLogin === '') {
-                    return false // Exclude users who never logged in (handled by other check)
-                }
-                const lastLogin = new Date(user.lastLogin)
-                return lastLogin < thresholdDate
-            })
-
-            const hasIssue = inactiveUsers.length > 0
-
+            const users = data.users
+            const total = users.length
             return {
-                status: hasIssue ? 'warning' : 'pass',
-                message: hasIssue
-                    ? `Found ${inactiveUsers.length} users who haven't logged in for ${maxMonths}+ months`
+                status: total > 0 ? 'warning' : 'pass',
+                message: total > 0
+                    ? `Found ${total} users who haven't logged in for ${maxMonths}+ months`
                     : `All users with login history have recent activity (within ${maxMonths} months)`,
-                details: hasIssue
-                    ? `Consider disabling inactive accounts: ${inactiveUsers.slice(0, 5).map((u) => u.username).join(', ')}${inactiveUsers.length > 5 ? ` and ${inactiveUsers.length - 5} more` : ''}`
+                details: total > 0
+                    ? `Consider disabling inactive accounts: ${users.slice(0, 5).map((u) => u.username).join(', ')}${total > 5 ? ` and ${total - 5} more` : ''}`
                     : null,
             }
         },
@@ -463,40 +366,55 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Password Age Verification'),
         description: i18n.t('Checking for stale or unchanged passwords'),
         ranking: 0,
-        query: {
-            users: {
-                resource: 'users',
-                params: {
-                    fields: 'id,username,disabled,passwordLastUpdated,userCredentials[passwordLastUpdated]',
-                    paging: false,
-                    filter: 'disabled:eq:false',
-                },
-            },
-        },
-        evaluate: (data) => {
-            const users = data.users.users
+        fetch: async (engine, ctx) => {
             const maxAgeDays = config.maxPasswordAgeDays || 365
             const thresholdDate = new Date()
             thresholdDate.setDate(thresholdDate.getDate() - maxAgeDays)
+            const thresholdIso = thresholdDate.toISOString().slice(0, 10)
+            const pwField = passwordLastUpdatedField(ctx.systemVersion)
 
-            const stalePasswords = users.filter((user) => {
-                const passwordLastUpdated = getPasswordLastUpdated(user)
-                if (!passwordLastUpdated) {
-                    return true // Never changed
-                }
-                const lastUpdated = new Date(passwordLastUpdated)
-                return lastUpdated < thresholdDate
-            })
+            const [stale, neverSet] = await Promise.all([
+                fetchAllPaged(engine, {
+                    resource: 'users',
+                    params: {
+                        fields: 'id,username',
+                        filter: [
+                            'disabled:eq:false',
+                            `${pwField}:lt:${thresholdIso}`,
+                        ],
+                    },
+                }),
+                fetchAllPaged(engine, {
+                    resource: 'users',
+                    params: {
+                        fields: 'id,username',
+                        filter: ['disabled:eq:false', `${pwField}:null`],
+                    },
+                }),
+            ])
 
-            const hasIssue = stalePasswords.length > 0
-
+            // Server-side `:lt:` excludes nulls, so we union the two result
+            // sets to include both "never set" and "older than threshold".
+            const byId = new Map()
+            for (const u of stale) {
+                byId.set(u.id, u)
+            }
+            for (const u of neverSet) {
+                byId.set(u.id, u)
+            }
+            return { users: Array.from(byId.values()) }
+        },
+        evaluate: (data) => {
+            const maxAgeDays = config.maxPasswordAgeDays || 365
+            const users = data.users
+            const total = users.length
             return {
-                status: hasIssue ? 'warning' : 'pass',
-                message: hasIssue
-                    ? `Found ${stalePasswords.length} users with passwords older than ${maxAgeDays} days or never changed`
+                status: total > 0 ? 'warning' : 'pass',
+                message: total > 0
+                    ? `Found ${total} users with passwords older than ${maxAgeDays} days or never changed`
                     : `All user passwords are up to date (within ${maxAgeDays} days)`,
-                details: hasIssue
-                    ? `Users with stale passwords: ${stalePasswords.slice(0, 5).map((u) => u.username).join(', ')}${stalePasswords.length > 5 ? ` and ${stalePasswords.length - 5} more` : ''}`
+                details: total > 0
+                    ? `Users with stale passwords: ${users.slice(0, 5).map((u) => u.username).join(', ')}${total > 5 ? ` and ${total - 5} more` : ''}`
                     : null,
             }
         },
@@ -1199,6 +1117,37 @@ export const useSecurityAudit = (config = {}) => {
         const securityChecks = getSecurityChecks(configToUse)
         setProgress({ current: 0, total: securityChecks.length })
 
+        // Prefetch shared data once so dependent checks (authority lookups,
+        // version-aware filters) can reuse it. Failures are captured per
+        // resource so other checks still run.
+        const ctx = { systemVersion: null, privilegedRoles: null }
+        const [versionRes, rolesRes] = await Promise.allSettled([
+            engine.query({
+                systemInfo: {
+                    resource: 'system/info',
+                    params: { fields: 'version' },
+                },
+            }),
+            engine.query({
+                userRoles: {
+                    resource: 'userRoles',
+                    params: {
+                        fields: 'id,name,authorities',
+                        paging: false,
+                        filter: `authorities:in:[${PRIVILEGED_AUTHORITIES.join(',')}]`,
+                    },
+                },
+            }),
+        ])
+        if (versionRes.status === 'fulfilled') {
+            ctx.systemVersion = parseDhis2Version(
+                versionRes.value.systemInfo?.version
+            )
+        }
+        if (rolesRes.status === 'fulfilled') {
+            ctx.privilegedRoles = rolesRes.value.userRoles?.userRoles || []
+        }
+
         try {
             for (let i = 0; i < securityChecks.length; i++) {
                 const check = securityChecks[i]
@@ -1218,8 +1167,10 @@ export const useSecurityAudit = (config = {}) => {
                 ])
 
                 try {
-                    // Execute the query
-                    const data = await engine.query(check.query)
+                    // Execute the query (or the check's custom fetch).
+                    const data = check.fetch
+                        ? await check.fetch(engine, ctx)
+                        : await engine.query(check.query)
 
                     // Store API response for console
                     setApiResponses((prev) => [
@@ -1232,7 +1183,7 @@ export const useSecurityAudit = (config = {}) => {
                     ])
 
                     // Evaluate the result (handle both sync and async evaluate functions)
-                    const result = await Promise.resolve(check.evaluate(data))
+                    const result = await Promise.resolve(check.evaluate(data, ctx))
 
                     // Update the finding with results and sort by criticality and ranking
                     setFindings((prev) => {
