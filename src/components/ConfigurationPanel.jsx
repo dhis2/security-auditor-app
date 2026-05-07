@@ -9,6 +9,10 @@ import {
 } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { useAuditConfig } from '../hooks/useAuditConfig'
+import {
+    REQUIRED_CONFIG_KEYS,
+    validateConfig,
+} from '../utils/configValidation'
 import classes from './ConfigurationPanel.module.css'
 
 export const ConfigurationPanel = () => {
@@ -30,6 +34,13 @@ export const ConfigurationPanel = () => {
     }
 
     const handleSave = async () => {
+        const errors = validateConfig(localConfig)
+        if (errors.length > 0) {
+            setSaveMessage({ type: 'error', text: errors.join('. ') })
+            setTimeout(() => setSaveMessage(null), 5000)
+            return
+        }
+
         setSaving(true)
         setSaveMessage(null)
 
@@ -97,18 +108,18 @@ export const ConfigurationPanel = () => {
             const text = await file.text()
             const importedConfig = JSON.parse(text)
 
-            // Validate that imported config has expected structure
-            const requiredKeys = ['minPasswordLength', 'maxInactiveMonths', 'maxPasswordAgeDays', 'maxSuperUserRoles']
-            const hasAllKeys = requiredKeys.every(key => key in importedConfig)
-
-            if (!hasAllKeys) {
-                throw new Error('Invalid configuration file format')
+            const missingKeys = REQUIRED_CONFIG_KEYS.filter(
+                (key) => !(key in importedConfig)
+            )
+            if (missingKeys.length > 0) {
+                throw new Error(
+                    `Missing fields: ${missingKeys.join(', ')}`
+                )
             }
 
-            // Validate that values are numbers
-            const allNumbers = requiredKeys.every(key => typeof importedConfig[key] === 'number')
-            if (!allNumbers) {
-                throw new Error('Invalid configuration values')
+            const errors = validateConfig(importedConfig)
+            if (errors.length > 0) {
+                throw new Error(errors.join('. '))
             }
 
             const result = await saveConfig(importedConfig)

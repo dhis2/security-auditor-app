@@ -23,9 +23,32 @@ const timestampsRoughlyEqual = (a, b, toleranceMs = 60_000) => {
     return Number.isFinite(diff) && diff <= toleranceMs
 }
 
-const is404 = (error) =>
-    error?.details?.httpStatusCode === 404 ||
-    /\b404\b/.test(error?.message || '')
+// systemSettings keys pre-fetched as a single batched request.
+const PREFETCHED_SETTINGS_KEYS = [
+    'minPasswordLength',
+    'credentialsExpires',
+    'enforceVerifiedEmail',
+    'lockMultipleFailedLogins',
+]
+
+// Helper for header checks: returns the raw value from the shared prefetch
+// or null if the prefetch failed entirely (CORS, network, etc.).
+const getSharedHeader = (ctx, name) =>
+    ctx.responseHeaders ? ctx.responseHeaders.get(name) : null
+
+// Build the "could not check this header — shared response unavailable" finding.
+const headerUnavailableFinding = (label) => ({
+    status: 'warning',
+    message: `Unable to check ${label} header`,
+    details: 'The audit could not fetch response headers from this DHIS2 instance. This may be due to CORS restrictions or a network failure.',
+})
+
+// Used by settings checks when the bulk systemSettings prefetch failed.
+const settingsUnavailableFinding = (label) => ({
+    status: 'warning',
+    message: `Unable to check ${label}`,
+    details: 'The audit could not fetch system settings from this DHIS2 instance. The user may lack permission to read systemSettings, or the server may be unreachable.',
+})
 
 // Authorities pre-fetched as the audit's shared "privileged roles" set.
 const PRIVILEGED_AUTHORITIES = [
@@ -347,17 +370,12 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Password Policy Configuration'),
         description: i18n.t('Verifying minimum password length requirements'),
         ranking: 0,
-        query: {
-            settings: {
-                resource: 'systemSettings',
-                params: {
-                    key: ['minPasswordLength'],
-                },
-            },
-        },
-        evaluate: (data) => {
+        evaluate: (_data, ctx) => {
+            if (!ctx.systemSettings) {
+                return settingsUnavailableFinding('minimum password length')
+            }
             const minPasswordLength = parseInt(
-                data.settings?.minPasswordLength || 0,
+                ctx.systemSettings?.minPasswordLength || 0,
                 10
             )
             const requiredLength = config.minPasswordLength || 8
@@ -379,17 +397,12 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Password Expiry Policy'),
         description: i18n.t('Checking if forced password changes are enabled'),
         ranking: 0,
-        query: {
-            settings: {
-                resource: 'systemSettings',
-                params: {
-                    key: ['credentialsExpires'],
-                },
-            },
-        },
-        evaluate: (data) => {
+        evaluate: (_data, ctx) => {
+            if (!ctx.systemSettings) {
+                return settingsUnavailableFinding('password expiry policy')
+            }
             const credentialsExpires =
-                data.settings?.credentialsExpires || '0'
+                ctx.systemSettings?.credentialsExpires || '0'
             const expiryDays = parseInt(credentialsExpires, 10)
             const hasIssue = expiryDays === 0
 
@@ -409,17 +422,23 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Email Verification Enforcement'),
         description: i18n.t('Checking if email verification is enforced'),
         ranking: 0,
-        query: {
-            settings: {
-                resource: 'systemSettings',
-                params: {
-                    key: ['enforceVerifiedEmail'],
-                },
-            },
-        },
-        evaluate: (data) => {
+        evaluate: (_data, ctx) => {
+            const settings = ctx.systemSettings
+            if (!settings) {
+                return settingsUnavailableFinding('email verification')
+            }
+            // The `enforceVerifiedEmail` setting was introduced in DHIS2 v42.
+            // When the prefetch succeeded but the key is absent, the running
+            // server doesn't support the setting.
+            if (!('enforceVerifiedEmail' in settings)) {
+                return {
+                    status: 'warning',
+                    message: 'Email verification setting not available on this DHIS2 version',
+                    details: 'The enforceVerifiedEmail setting was introduced in DHIS2 v42. Upgrade to enable enforcement of verified email addresses.',
+                }
+            }
             const enforceVerifiedEmail =
-                data.settings?.enforceVerifiedEmail === 'true'
+                settings?.enforceVerifiedEmail === 'true'
             const hasIssue = !enforceVerifiedEmail
 
             return {
@@ -432,15 +451,6 @@ const getSecurityChecks = (config) => [
                     : null,
             }
         },
-        // The `enforceVerifiedEmail` setting was introduced in DHIS2 v42.
-        onError: (error) =>
-            is404(error)
-                ? {
-                      status: 'warning',
-                      message: 'Email verification setting not available on this DHIS2 version',
-                      details: 'The enforceVerifiedEmail setting was introduced in DHIS2 v42. Upgrade to enable enforcement of verified email addresses.',
-                  }
-                : null,
     },
     {
         id: 'https-connection',
@@ -523,17 +533,23 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Account Lockout Policy'),
         description: i18n.t('Checking if account lockout after failed login attempts is enabled'),
         ranking: 0,
-        query: {
-            settings: {
-                resource: 'systemSettings',
-                params: {
-                    key: ['lockMultipleFailedLogins'],
-                },
-            },
-        },
-        evaluate: (data) => {
+        evaluate: (_data, ctx) => {
+            const settings = ctx.systemSettings
+            if (!settings) {
+                return settingsUnavailableFinding('account lockout policy')
+            }
+            // Older DHIS2 versions don't expose `lockMultipleFailedLogins`
+            // via /api/systemSettings; absence from the prefetched response
+            // means the setting can't be inspected on this server.
+            if (!('lockMultipleFailedLogins' in settings)) {
+                return {
+                    status: 'warning',
+                    message: 'Account lockout setting not available on this DHIS2 version',
+                    details: 'The lockMultipleFailedLogins setting is not exposed via the API on this DHIS2 version. Upgrade to enable automated lockout after failed login attempts.',
+                }
+            }
             const lockMultipleFailedLogins =
-                data.settings?.lockMultipleFailedLogins === 'true'
+                settings?.lockMultipleFailedLogins === 'true'
             const hasIssue = !lockMultipleFailedLogins
 
             return {
@@ -546,66 +562,29 @@ const getSecurityChecks = (config) => [
                     : null,
             }
         },
-        // The `lockMultipleFailedLogins` setting key is not exposed via
-        // /api/systemSettings on older DHIS2 versions (e.g. v41 returns 404).
-        onError: (error) =>
-            is404(error)
-                ? {
-                      status: 'warning',
-                      message: 'Account lockout setting not available on this DHIS2 version',
-                      details: 'The lockMultipleFailedLogins setting is not exposed via the API on this DHIS2 version. Upgrade to enable automated lockout after failed login attempts.',
-                  }
-                : null,
     },
     {
         id: 'hsts-header',
         title: i18n.t('HTTP Strict Transport Security (HSTS)'),
         description: i18n.t('Checking for HSTS header to enforce HTTPS'),
         ranking: 0,
-        query: {
-            systemInfo: {
-                resource: 'system/info',
-                params: {
-                    fields: 'contextPath',
-                },
-            },
-        },
-        evaluate: async (data) => {
-            try {
-                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
-                // Make a fetch request to check response headers
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
-
-                const hstsHeader = response.headers.get(
-                    'strict-transport-security'
-                )
-
-                if (hstsHeader) {
-                    return {
-                        status: 'pass',
-                        message: 'HSTS header is configured',
-                        details: `Strict-Transport-Security: ${hstsHeader}`,
-                    }
-                } else {
-                    return {
-                        status: 'warning',
-                        message: 'HSTS header is not present',
-                        details:
-                            'The server is not sending the Strict-Transport-Security header. This header enforces HTTPS connections and prevents protocol downgrade attacks. Consider adding: "Strict-Transport-Security: max-age=31536000; includeSubDomains"',
-                    }
-                }
-            } catch (error) {
+        evaluate: (_data, ctx) => {
+            if (!ctx.responseHeaders) {
+                return headerUnavailableFinding('HSTS')
+            }
+            const hstsHeader = getSharedHeader(ctx, 'strict-transport-security')
+            if (hstsHeader) {
                 return {
-                    status: 'warning',
-                    message: 'Unable to check HSTS header',
-                    details: `Error checking HSTS header: ${error.message}. This may be due to CORS restrictions. Manually verify if the server sends the "Strict-Transport-Security" header.`,
+                    status: 'pass',
+                    message: 'HSTS header is configured',
+                    details: `Strict-Transport-Security: ${hstsHeader}`,
                 }
+            }
+            return {
+                status: 'warning',
+                message: 'HSTS header is not present',
+                details:
+                    'The server is not sending the Strict-Transport-Security header. This header enforces HTTPS connections and prevents protocol downgrade attacks. Consider adding: "Strict-Transport-Security: max-age=31536000; includeSubDomains"',
             }
         },
     },
@@ -614,46 +593,22 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Server Header Exposure'),
         description: i18n.t('Checking if server version information is exposed'),
         ranking: 0,
-        query: {
-            systemInfo: {
-                resource: 'system/info',
-                params: {
-                    fields: 'contextPath',
-                },
-            },
-        },
-        evaluate: async (data) => {
-            try {
-                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
-
-                const serverHeader = response.headers.get('server')
-
-                if (!serverHeader) {
-                    return {
-                        status: 'pass',
-                        message: 'Server header is not exposed',
-                        details: 'The server does not disclose version information in the Server header, which is a good security practice.',
-                    }
-                } else {
-                    return {
-                        status: 'warning',
-                        message: 'Server header exposes version information',
-                        details: `Server: ${serverHeader}. Exposing server version information can help attackers identify known vulnerabilities. Consider removing or obfuscating the Server header.`,
-                    }
-                }
-            } catch (error) {
+        evaluate: (_data, ctx) => {
+            if (!ctx.responseHeaders) {
+                return headerUnavailableFinding('Server')
+            }
+            const serverHeader = getSharedHeader(ctx, 'server')
+            if (!serverHeader) {
                 return {
-                    status: 'error',
-                    message: 'Unable to check Server header',
-                    details: `Error checking Server header: ${error.message}`,
+                    status: 'pass',
+                    message: 'Server header is not exposed',
+                    details: 'The server does not disclose version information in the Server header, which is a good security practice.',
                 }
+            }
+            return {
+                status: 'warning',
+                message: 'Server header exposes version information',
+                details: `Server: ${serverHeader}. Exposing server version information can help attackers identify known vulnerabilities. Consider removing or obfuscating the Server header.`,
             }
         },
     },
@@ -662,69 +617,44 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Cross-Origin-Opener-Policy (COOP)'),
         description: i18n.t('Checking for COOP header to isolate browsing context'),
         ranking: 0,
-        query: {
-            systemInfo: {
-                resource: 'system/info',
-                params: {
-                    fields: 'contextPath',
-                },
-            },
-        },
-        evaluate: async (data) => {
-            try {
-                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
-
-                const coopHeader = response.headers.get('cross-origin-opener-policy')
-
-                if (coopHeader) {
-                    // Check the value of COOP
-                    const normalizedValue = coopHeader.toLowerCase().trim()
-
-                    if (normalizedValue === 'same-origin') {
-                        return {
-                            status: 'pass',
-                            message: 'COOP header is properly configured with same-origin',
-                            details: `Cross-Origin-Opener-Policy: ${coopHeader}. This provides the strongest isolation.`,
-                        }
-                    } else if (normalizedValue === 'same-origin-allow-popups') {
-                        return {
-                            status: 'pass',
-                            message: 'COOP header is configured with same-origin-allow-popups',
-                            details: `Cross-Origin-Opener-Policy: ${coopHeader}. This provides good isolation while allowing popups.`,
-                        }
-                    } else if (normalizedValue === 'unsafe-none') {
-                        return {
-                            status: 'warning',
-                            message: 'COOP header is set to unsafe-none',
-                            details: `Cross-Origin-Opener-Policy: ${coopHeader}. Consider using "same-origin" or "same-origin-allow-popups" for better security.`,
-                        }
-                    } else {
-                        return {
-                            status: 'warning',
-                            message: `COOP header has unexpected value: ${coopHeader}`,
-                            details: 'Valid values are: same-origin, same-origin-allow-popups, or unsafe-none.',
-                        }
-                    }
-                } else {
-                    return {
-                        status: 'warning',
-                        message: 'COOP header is not present',
-                        details: 'The Cross-Origin-Opener-Policy header is not configured. This header helps protect against cross-origin attacks by isolating the browsing context. Consider adding: "Cross-Origin-Opener-Policy: same-origin".',
-                    }
-                }
-            } catch (error) {
+        evaluate: (_data, ctx) => {
+            if (!ctx.responseHeaders) {
+                return headerUnavailableFinding('COOP')
+            }
+            const coopHeader = getSharedHeader(ctx, 'cross-origin-opener-policy')
+            if (!coopHeader) {
                 return {
-                    status: 'error',
-                    message: 'Unable to check COOP header',
-                    details: `Error checking COOP header: ${error.message}. This may be due to CORS restrictions.`,
+                    status: 'warning',
+                    message: 'COOP header is not present',
+                    details: 'The Cross-Origin-Opener-Policy header is not configured. This header helps protect against cross-origin attacks by isolating the browsing context. Consider adding: "Cross-Origin-Opener-Policy: same-origin".',
                 }
+            }
+            const normalizedValue = coopHeader.toLowerCase().trim()
+            if (normalizedValue === 'same-origin') {
+                return {
+                    status: 'pass',
+                    message: 'COOP header is properly configured with same-origin',
+                    details: `Cross-Origin-Opener-Policy: ${coopHeader}. This provides the strongest isolation.`,
+                }
+            }
+            if (normalizedValue === 'same-origin-allow-popups') {
+                return {
+                    status: 'pass',
+                    message: 'COOP header is configured with same-origin-allow-popups',
+                    details: `Cross-Origin-Opener-Policy: ${coopHeader}. This provides good isolation while allowing popups.`,
+                }
+            }
+            if (normalizedValue === 'unsafe-none') {
+                return {
+                    status: 'warning',
+                    message: 'COOP header is set to unsafe-none',
+                    details: `Cross-Origin-Opener-Policy: ${coopHeader}. Consider using "same-origin" or "same-origin-allow-popups" for better security.`,
+                }
+            }
+            return {
+                status: 'warning',
+                message: `COOP header has unexpected value: ${coopHeader}`,
+                details: 'Valid values are: same-origin, same-origin-allow-popups, or unsafe-none.',
             }
         },
     },
@@ -733,68 +663,44 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Cross-Origin-Embedder-Policy (COEP)'),
         description: i18n.t('Checking for COEP header to control resource loading'),
         ranking: 0,
-        query: {
-            systemInfo: {
-                resource: 'system/info',
-                params: {
-                    fields: 'contextPath',
-                },
-            },
-        },
-        evaluate: async (data) => {
-            try {
-                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
-
-                const coepHeader = response.headers.get('cross-origin-embedder-policy')
-
-                if (coepHeader) {
-                    const normalizedValue = coepHeader.toLowerCase().trim()
-
-                    if (normalizedValue === 'require-corp') {
-                        return {
-                            status: 'pass',
-                            message: 'COEP header is properly configured with require-corp',
-                            details: `Cross-Origin-Embedder-Policy: ${coepHeader}. This ensures all resources are explicitly marked for cross-origin loading.`,
-                        }
-                    } else if (normalizedValue === 'credentialless') {
-                        return {
-                            status: 'pass',
-                            message: 'COEP header is configured with credentialless',
-                            details: `Cross-Origin-Embedder-Policy: ${coepHeader}. This loads cross-origin resources without credentials.`,
-                        }
-                    } else if (normalizedValue === 'unsafe-none') {
-                        return {
-                            status: 'warning',
-                            message: 'COEP header is set to unsafe-none',
-                            details: `Cross-Origin-Embedder-Policy: ${coepHeader}. Consider using "require-corp" for better security.`,
-                        }
-                    } else {
-                        return {
-                            status: 'warning',
-                            message: `COEP header has unexpected value: ${coepHeader}`,
-                            details: 'Valid values are: require-corp, credentialless, or unsafe-none.',
-                        }
-                    }
-                } else {
-                    return {
-                        status: 'warning',
-                        message: 'COEP header is not present',
-                        details: 'The Cross-Origin-Embedder-Policy header is not configured. This header, combined with COOP, enables cross-origin isolation and provides access to powerful features. Consider adding: "Cross-Origin-Embedder-Policy: require-corp".',
-                    }
-                }
-            } catch (error) {
+        evaluate: (_data, ctx) => {
+            if (!ctx.responseHeaders) {
+                return headerUnavailableFinding('COEP')
+            }
+            const coepHeader = getSharedHeader(ctx, 'cross-origin-embedder-policy')
+            if (!coepHeader) {
                 return {
-                    status: 'error',
-                    message: 'Unable to check COEP header',
-                    details: `Error checking COEP header: ${error.message}. This may be due to CORS restrictions.`,
+                    status: 'warning',
+                    message: 'COEP header is not present',
+                    details: 'The Cross-Origin-Embedder-Policy header is not configured. This header, combined with COOP, enables cross-origin isolation and provides access to powerful features. Consider adding: "Cross-Origin-Embedder-Policy: require-corp".',
                 }
+            }
+            const normalizedValue = coepHeader.toLowerCase().trim()
+            if (normalizedValue === 'require-corp') {
+                return {
+                    status: 'pass',
+                    message: 'COEP header is properly configured with require-corp',
+                    details: `Cross-Origin-Embedder-Policy: ${coepHeader}. This ensures all resources are explicitly marked for cross-origin loading.`,
+                }
+            }
+            if (normalizedValue === 'credentialless') {
+                return {
+                    status: 'pass',
+                    message: 'COEP header is configured with credentialless',
+                    details: `Cross-Origin-Embedder-Policy: ${coepHeader}. This loads cross-origin resources without credentials.`,
+                }
+            }
+            if (normalizedValue === 'unsafe-none') {
+                return {
+                    status: 'warning',
+                    message: 'COEP header is set to unsafe-none',
+                    details: `Cross-Origin-Embedder-Policy: ${coepHeader}. Consider using "require-corp" for better security.`,
+                }
+            }
+            return {
+                status: 'warning',
+                message: `COEP header has unexpected value: ${coepHeader}`,
+                details: 'Valid values are: require-corp, credentialless, or unsafe-none.',
             }
         },
     },
@@ -803,68 +709,44 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Cross-Origin-Resource-Policy (CORP)'),
         description: i18n.t('Checking for CORP header to control resource embedding'),
         ranking: 0,
-        query: {
-            systemInfo: {
-                resource: 'system/info',
-                params: {
-                    fields: 'contextPath',
-                },
-            },
-        },
-        evaluate: async (data) => {
-            try {
-                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
-
-                const corpHeader = response.headers.get('cross-origin-resource-policy')
-
-                if (corpHeader) {
-                    const normalizedValue = corpHeader.toLowerCase().trim()
-
-                    if (normalizedValue === 'same-origin') {
-                        return {
-                            status: 'pass',
-                            message: 'CORP header is configured with same-origin',
-                            details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can only be loaded from the same origin.`,
-                        }
-                    } else if (normalizedValue === 'same-site') {
-                        return {
-                            status: 'pass',
-                            message: 'CORP header is configured with same-site',
-                            details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can be loaded from the same site.`,
-                        }
-                    } else if (normalizedValue === 'cross-origin') {
-                        return {
-                            status: 'warning',
-                            message: 'CORP header is set to cross-origin',
-                            details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can be loaded from any origin. Consider using "same-origin" or "same-site" for better security.`,
-                        }
-                    } else {
-                        return {
-                            status: 'warning',
-                            message: `CORP header has unexpected value: ${corpHeader}`,
-                            details: 'Valid values are: same-origin, same-site, or cross-origin.',
-                        }
-                    }
-                } else {
-                    return {
-                        status: 'warning',
-                        message: 'CORP header is not present',
-                        details: 'The Cross-Origin-Resource-Policy header is not configured. This header protects resources from being loaded by other origins. Consider adding: "Cross-Origin-Resource-Policy: same-origin".',
-                    }
-                }
-            } catch (error) {
+        evaluate: (_data, ctx) => {
+            if (!ctx.responseHeaders) {
+                return headerUnavailableFinding('CORP')
+            }
+            const corpHeader = getSharedHeader(ctx, 'cross-origin-resource-policy')
+            if (!corpHeader) {
                 return {
-                    status: 'error',
-                    message: 'Unable to check CORP header',
-                    details: `Error checking CORP header: ${error.message}. This may be due to CORS restrictions.`,
+                    status: 'warning',
+                    message: 'CORP header is not present',
+                    details: 'The Cross-Origin-Resource-Policy header is not configured. This header protects resources from being loaded by other origins. Consider adding: "Cross-Origin-Resource-Policy: same-origin".',
                 }
+            }
+            const normalizedValue = corpHeader.toLowerCase().trim()
+            if (normalizedValue === 'same-origin') {
+                return {
+                    status: 'pass',
+                    message: 'CORP header is configured with same-origin',
+                    details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can only be loaded from the same origin.`,
+                }
+            }
+            if (normalizedValue === 'same-site') {
+                return {
+                    status: 'pass',
+                    message: 'CORP header is configured with same-site',
+                    details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can be loaded from the same site.`,
+                }
+            }
+            if (normalizedValue === 'cross-origin') {
+                return {
+                    status: 'warning',
+                    message: 'CORP header is set to cross-origin',
+                    details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can be loaded from any origin. Consider using "same-origin" or "same-site" for better security.`,
+                }
+            }
+            return {
+                status: 'warning',
+                message: `CORP header has unexpected value: ${corpHeader}`,
+                details: 'Valid values are: same-origin, same-site, or cross-origin.',
             }
         },
     },
@@ -873,72 +755,45 @@ const getSecurityChecks = (config) => [
         title: i18n.t('CORS Headers Configuration'),
         description: i18n.t('Checking Access-Control-Allow-Origin and credentials configuration'),
         ranking: 0,
-        query: {
-            systemInfo: {
-                resource: 'system/info',
-                params: {
-                    fields: 'contextPath',
-                },
-            },
-        },
-        evaluate: async (data) => {
-            try {
-                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
+        evaluate: (_data, ctx) => {
+            if (!ctx.responseHeaders) {
+                return headerUnavailableFinding('CORS')
+            }
+            const allowOrigin = getSharedHeader(ctx, 'access-control-allow-origin')
+            const allowCredentials = getSharedHeader(ctx, 'access-control-allow-credentials')
 
-                const allowOrigin = response.headers.get('access-control-allow-origin')
-                const allowCredentials = response.headers.get('access-control-allow-credentials')
-
-                // Check for dangerous combinations
-                if (allowOrigin === '*' && allowCredentials === 'true') {
-                    return {
-                        status: 'fail',
-                        message: 'Dangerous CORS configuration detected',
-                        details: 'Access-Control-Allow-Origin is set to wildcard (*) with Access-Control-Allow-Credentials: true. This is a critical security vulnerability that allows any origin to make authenticated requests. Change Access-Control-Allow-Origin to specific trusted origins.',
-                    }
+            if (allowOrigin === '*' && allowCredentials === 'true') {
+                return {
+                    status: 'fail',
+                    message: 'Dangerous CORS configuration detected',
+                    details: 'Access-Control-Allow-Origin is set to wildcard (*) with Access-Control-Allow-Credentials: true. This is a critical security vulnerability that allows any origin to make authenticated requests. Change Access-Control-Allow-Origin to specific trusted origins.',
                 }
-
-                if (allowOrigin === '*') {
-                    return {
-                        status: 'warning',
-                        message: 'CORS allows all origins',
-                        details: 'Access-Control-Allow-Origin: *. This allows any website to make requests to your API. Consider restricting to specific trusted origins unless this is intentional for a public API.',
-                    }
+            }
+            if (allowOrigin === '*') {
+                return {
+                    status: 'warning',
+                    message: 'CORS allows all origins',
+                    details: 'Access-Control-Allow-Origin: *. This allows any website to make requests to your API. Consider restricting to specific trusted origins unless this is intentional for a public API.',
                 }
-
-                if (allowOrigin && allowCredentials === 'true') {
-                    return {
-                        status: 'warning',
-                        message: 'CORS allows credentials from specific origin',
-                        details: `Access-Control-Allow-Origin: ${allowOrigin}, Access-Control-Allow-Credentials: true. Ensure this origin is trusted as it can make authenticated requests.`,
-                    }
+            }
+            if (allowOrigin && allowCredentials === 'true') {
+                return {
+                    status: 'warning',
+                    message: 'CORS allows credentials from specific origin',
+                    details: `Access-Control-Allow-Origin: ${allowOrigin}, Access-Control-Allow-Credentials: true. Ensure this origin is trusted as it can make authenticated requests.`,
                 }
-
-                if (allowOrigin) {
-                    return {
-                        status: 'pass',
-                        message: 'CORS configured with specific origin',
-                        details: `Access-Control-Allow-Origin: ${allowOrigin}${allowCredentials ? `, Access-Control-Allow-Credentials: ${allowCredentials}` : ''}`,
-                    }
-                }
-
+            }
+            if (allowOrigin) {
                 return {
                     status: 'pass',
-                    message: 'No CORS headers present',
-                    details: 'Access-Control-Allow-Origin header is not set. This is appropriate if cross-origin requests are not needed.',
+                    message: 'CORS configured with specific origin',
+                    details: `Access-Control-Allow-Origin: ${allowOrigin}${allowCredentials ? `, Access-Control-Allow-Credentials: ${allowCredentials}` : ''}`,
                 }
-            } catch (error) {
-                return {
-                    status: 'error',
-                    message: 'Unable to check CORS headers',
-                    details: `Error checking CORS headers: ${error.message}`,
-                }
+            }
+            return {
+                status: 'pass',
+                message: 'No CORS headers present',
+                details: 'Access-Control-Allow-Origin header is not set. This is appropriate if cross-origin requests are not needed.',
             }
         },
     },
@@ -947,78 +802,49 @@ const getSecurityChecks = (config) => [
         title: i18n.t('Content Security Policy (CSP)'),
         description: i18n.t('Checking for CSP header and violations'),
         ranking: 0,
-        query: {
-            systemInfo: {
-                resource: 'system/info',
-                params: {
-                    fields: 'contextPath',
-                },
-            },
-        },
-        evaluate: async (data) => {
-            try {
-                const apiUrl = getApiUrl(data.systemInfo?.contextPath)
-                // Make a fetch request to check response headers
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
+        evaluate: (_data, ctx) => {
+            if (!ctx.responseHeaders) {
+                return headerUnavailableFinding('CSP')
+            }
+            const cspHeader =
+                getSharedHeader(ctx, 'content-security-policy') ||
+                getSharedHeader(ctx, 'content-security-policy-report-only')
+            const isReportOnly = !getSharedHeader(ctx, 'content-security-policy')
 
-                const cspHeader =
-                    response.headers.get('content-security-policy') ||
-                    response.headers.get('content-security-policy-report-only')
-
-                const isReportOnly = !response.headers.get(
-                    'content-security-policy'
-                )
-
-                if (cspHeader) {
-                    // Check for common CSP directives
-                    const hasDefaultSrc = cspHeader.includes('default-src')
-                    const hasScriptSrc = cspHeader.includes('script-src')
-                    const hasUnsafeInline = cspHeader.includes("'unsafe-inline'")
-                    const hasUnsafeEval = cspHeader.includes("'unsafe-eval'")
-
-                    const warnings = []
-                    if (isReportOnly) {
-                        warnings.push('CSP is in report-only mode')
-                    }
-                    if (hasUnsafeInline) {
-                        warnings.push("'unsafe-inline' is present")
-                    }
-                    if (hasUnsafeEval) {
-                        warnings.push("'unsafe-eval' is present")
-                    }
-                    if (!hasDefaultSrc && !hasScriptSrc) {
-                        warnings.push('No default-src or script-src directive')
-                    }
-
-                    const hasIssues = warnings.length > 0
-
-                    return {
-                        status: hasIssues ? 'warning' : 'pass',
-                        message: hasIssues
-                            ? `CSP header configured with warnings: ${warnings.join(', ')}`
-                            : 'CSP header is properly configured',
-                        details: `Content-Security-Policy${isReportOnly ? '-Report-Only' : ''}: ${cspHeader}`,
-                    }
-                } else {
-                    return {
-                        status: 'warning',
-                        message: 'CSP header is not present',
-                        details:
-                            'The server is not sending a Content-Security-Policy header. CSP helps prevent XSS attacks, clickjacking, and other code injection attacks. Consider implementing a CSP policy.',
-                    }
-                }
-            } catch (error) {
+            if (!cspHeader) {
                 return {
                     status: 'warning',
-                    message: 'Unable to check CSP header',
-                    details: `Error checking CSP header: ${error.message}. This may be due to CORS restrictions. Manually verify if the server sends the "Content-Security-Policy" header.`,
+                    message: 'CSP header is not present',
+                    details:
+                        'The server is not sending a Content-Security-Policy header. CSP helps prevent XSS attacks, clickjacking, and other code injection attacks. Consider implementing a CSP policy.',
                 }
+            }
+            const hasDefaultSrc = cspHeader.includes('default-src')
+            const hasScriptSrc = cspHeader.includes('script-src')
+            const hasUnsafeInline = cspHeader.includes("'unsafe-inline'")
+            const hasUnsafeEval = cspHeader.includes("'unsafe-eval'")
+
+            const warnings = []
+            if (isReportOnly) {
+                warnings.push('CSP is in report-only mode')
+            }
+            if (hasUnsafeInline) {
+                warnings.push("'unsafe-inline' is present")
+            }
+            if (hasUnsafeEval) {
+                warnings.push("'unsafe-eval' is present")
+            }
+            if (!hasDefaultSrc && !hasScriptSrc) {
+                warnings.push('No default-src or script-src directive')
+            }
+
+            const hasIssues = warnings.length > 0
+            return {
+                status: hasIssues ? 'warning' : 'pass',
+                message: hasIssues
+                    ? `CSP header configured with warnings: ${warnings.join(', ')}`
+                    : 'CSP header is properly configured',
+                details: `Content-Security-Policy${isReportOnly ? '-Report-Only' : ''}: ${cspHeader}`,
             }
         },
     },
@@ -1040,15 +866,22 @@ export const useSecurityAudit = (config = {}) => {
         const securityChecks = getSecurityChecks(configToUse)
         setProgress({ current: 0, total: securityChecks.length })
 
-        // Prefetch shared data once so dependent checks (authority lookups,
-        // version-aware filters) can reuse it. Failures are captured per
-        // resource so other checks still run.
-        const ctx = { systemVersion: null, privilegedRoles: null }
-        const [versionRes, rolesRes] = await Promise.allSettled([
+        // Prefetch shared data once so dependent checks can reuse it. Each
+        // resource is independently captured so a failure in one (e.g. CORS)
+        // doesn't cascade to unrelated checks.
+        const ctx = {
+            systemVersion: null,
+            systemInfo: null,
+            privilegedRoles: null,
+            systemSettings: null,
+            responseHeaders: null,
+        }
+
+        const [versionRes, rolesRes, settingsRes] = await Promise.allSettled([
             engine.query({
                 systemInfo: {
                     resource: 'system/info',
-                    params: { fields: 'version' },
+                    params: { fields: 'version,contextPath' },
                 },
             }),
             engine.query({
@@ -1061,14 +894,36 @@ export const useSecurityAudit = (config = {}) => {
                     },
                 },
             }),
+            engine.query({
+                settings: {
+                    resource: 'systemSettings',
+                    params: { key: PREFETCHED_SETTINGS_KEYS },
+                },
+            }),
         ])
         if (versionRes.status === 'fulfilled') {
-            ctx.systemVersion = parseDhis2Version(
-                versionRes.value.systemInfo?.version
-            )
+            ctx.systemInfo = versionRes.value.systemInfo || null
+            ctx.systemVersion = parseDhis2Version(ctx.systemInfo?.version)
         }
         if (rolesRes.status === 'fulfilled') {
             ctx.privilegedRoles = rolesRes.value.userRoles?.userRoles || []
+        }
+        if (settingsRes.status === 'fulfilled') {
+            ctx.systemSettings = settingsRes.value.settings || {}
+        }
+
+        // Single fetch for response-header checks. Depends on systemInfo for
+        // the contextPath; runs after the engine.query batch above so we can
+        // build the URL.
+        try {
+            const apiUrl = getApiUrl(ctx.systemInfo?.contextPath)
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                credentials: 'include',
+            })
+            ctx.responseHeaders = response.headers
+        } catch {
+            // Network or CORS failure — checks fall back to the "unavailable" finding.
         }
 
         try {
@@ -1090,10 +945,18 @@ export const useSecurityAudit = (config = {}) => {
                 ])
 
                 try {
-                    // Execute the query (or the check's custom fetch).
-                    const data = check.fetch
-                        ? await check.fetch(engine, ctx)
-                        : await engine.query(check.query)
+                    // Resolve the check's data. Three modes:
+                    //   - `check.fetch(engine, ctx)` for paged/multi-step fetches
+                    //   - `check.query` for simple single-resource queries
+                    //   - neither: the check consumes only the shared prefetch ctx
+                    let data
+                    if (check.fetch) {
+                        data = await check.fetch(engine, ctx)
+                    } else if (check.query) {
+                        data = await engine.query(check.query)
+                    } else {
+                        data = null
+                    }
 
                     // Store API response for console
                     setApiResponses((prev) => [
