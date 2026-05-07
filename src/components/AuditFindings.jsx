@@ -15,6 +15,10 @@ import {
 import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
 import { APP_VERSION as appVersion } from '../version'
+import { downloadBlob } from '../utils/download'
+import { escapeHtml } from '../utils/html'
+import { getServerHeader } from '../utils/instanceInfo'
+import { getReportSystemInfoItems } from '../utils/systemInfoItems'
 import classes from './AuditFindings.module.css'
 
 const systemInfoQuery = {
@@ -67,31 +71,20 @@ const StatusBadge = ({ status }) => {
 
 export const AuditFindings = ({ findings, auditStatus, progress }) => {
     const [generating, setGenerating] = useState(false)
-    const [webServer, setWebServer] = useState('Loading...')
+    const [exportError, setExportError] = useState(null)
     const { data: systemInfoData } = useDataQuery(systemInfoQuery)
 
     const generatePDFReport = async () => {
         setGenerating(true)
+        setExportError(null)
 
         try {
             const systemInfo = systemInfoData?.systemInfo || {}
-
-            // Fetch web server info
-            let serverHeader = 'Unable to detect'
-            try {
-                const contextPath = systemInfo.contextPath
-                const apiUrl = contextPath ? `${contextPath}/api/me` : '../api/me'
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
-                serverHeader = response.headers.get('server') || 'Not disclosed'
-            } catch (error) {
-                serverHeader = 'Unable to detect'
-            }
+            const fetchedHeader = await getServerHeader(systemInfo.contextPath)
+            const serverHeader =
+                fetchedHeader === null
+                    ? 'Unable to detect'
+                    : fetchedHeader || 'Not disclosed'
             const reportDate = new Date().toLocaleString()
 
             // Create HTML content for the report
@@ -190,7 +183,7 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 <body>
     <h1>DHIS2 Security Audit Report</h1>
     <div class="header-info">
-        <strong>Report Generated:</strong> ${reportDate}<br>
+        <strong>Report Generated:</strong> ${escapeHtml(reportDate)}<br>
         <strong>Total Checks:</strong> ${findings.length}<br>
         <strong>Failed:</strong> ${findings.filter(f => f.status === 'fail').length}<br>
         <strong>Warnings:</strong> ${findings.filter(f => f.status === 'warning').length}<br>
@@ -199,54 +192,14 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 
     <h2>System Information</h2>
     <div class="system-info">
-        <div class="info-item">
-            <div class="info-label">Security Auditor Version</div>
-            <div class="info-value">${appVersion}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Server URL</div>
-            <div class="info-value">${systemInfo.instanceBaseUrl || window.location.origin}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">System ID</div>
-            <div class="info-value">${systemInfo.systemId || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">DHIS2 Version</div>
-            <div class="info-value">${systemInfo.version || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Build Revision</div>
-            <div class="info-value">${systemInfo.revision || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Operating System</div>
-            <div class="info-value">${systemInfo.osName || 'N/A'} ${systemInfo.osVersion || ''}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Java Version</div>
-            <div class="info-value">${systemInfo.javaVersion || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Servlet Container</div>
-            <div class="info-value">${systemInfo.serverInfo || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Web Server</div>
-            <div class="info-value">${serverHeader}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Database</div>
-            <div class="info-value">${systemInfo.databaseInfo?.name || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Database Version</div>
-            <div class="info-value">${systemInfo.databaseInfo?.databaseVersion || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">External Directory</div>
-            <div class="info-value">${systemInfo.externalDirectory || 'N/A'}</div>
-        </div>
+${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
+    .map(
+        (item) => `        <div class="info-item">
+            <div class="info-label">${escapeHtml(item.label)}</div>
+            <div class="info-value">${escapeHtml(item.value || 'N/A')}</div>
+        </div>`
+    )
+    .join('\n')}
     </div>
 
     <h2>Security Findings</h2>
@@ -266,13 +219,13 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
                 htmlContent += `
             <tr>
                 <td>
-                    <strong>${finding.title}</strong><br>
-                    <span style="font-size: 0.9em; color: #666;">${finding.description}</span>
+                    <strong>${escapeHtml(finding.title)}</strong><br>
+                    <span style="font-size: 0.9em; color: #666;">${escapeHtml(finding.description)}</span>
                 </td>
-                <td class="${statusClass}">${finding.status.toUpperCase()}</td>
+                <td class="${statusClass}">${escapeHtml(finding.status.toUpperCase())}</td>
                 <td>
-                    ${finding.message || ''}
-                    ${finding.details ? `<div class="details">${finding.details}</div>` : ''}
+                    ${escapeHtml(finding.message || '')}
+                    ${finding.details ? `<div class="details">${escapeHtml(finding.details)}</div>` : ''}
                 </td>
             </tr>
 `
@@ -285,18 +238,13 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 </html>
 `
 
-            // Create blob and download
             const blob = new Blob([htmlContent], { type: 'text/html' })
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `dhis2-security-audit-${new Date().toISOString().split('T')[0]}.html`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
+            downloadBlob(
+                blob,
+                `dhis2-security-audit-${new Date().toISOString().split('T')[0]}.html`
+            )
         } catch (error) {
-            console.error('Error generating report:', error)
+            setExportError(error.message || i18n.t('Unknown error'))
         } finally {
             setGenerating(false)
         }
@@ -410,6 +358,14 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 
                     {auditStatus === 'completed' && (
                         <div className={classes.reportButton}>
+                            {exportError && (
+                                <NoticeBox
+                                    error
+                                    title={i18n.t('Failed to generate report')}
+                                >
+                                    {exportError}
+                                </NoticeBox>
+                            )}
                             <Button
                                 onClick={generatePDFReport}
                                 disabled={generating}

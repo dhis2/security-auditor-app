@@ -4,6 +4,7 @@ import { useDataQuery } from '@dhis2/app-runtime'
 import { Card, NoticeBox, CircularLoader } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { SecurityAuditor } from './components/SecurityAuditor'
+import { AuditConfigProvider } from './hooks/useAuditConfig'
 
 const currentUserQuery = {
     me: {
@@ -46,14 +47,21 @@ const MyApp = () => {
                         {i18n.t('Security Auditor')}
                     </h2>
                     <NoticeBox warning title={i18n.t('Administrator Access Required')}>
-                        {i18n.t('This tool is available for administrators only. You need the ALL or F_SYSTEM_SETTING authority to access the Security Auditor.')}
+                        {i18n.t(
+                            'This tool is available for administrators only. You need the {{authAll}} or {{authSystemSetting}} authority to access the Security Auditor.',
+                            { authAll: 'ALL', authSystemSetting: 'F_SYSTEM_SETTING' }
+                        )}
                     </NoticeBox>
                 </Card>
             </div>
         )
     }
 
-    return <SecurityAuditor />
+    return (
+        <AuditConfigProvider>
+            <SecurityAuditor />
+        </AuditConfigProvider>
+    )
 }
 
 export default MyApp
