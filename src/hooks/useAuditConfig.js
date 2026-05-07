@@ -96,7 +96,6 @@ export const useAuditConfig = () => {
                 return DEFAULT_CONFIG
             } else {
                 setError(err.message || 'Failed to load configuration')
-                console.error('Error loading config:', err)
                 return DEFAULT_CONFIG
             }
         } finally {

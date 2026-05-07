@@ -69,11 +69,13 @@ const StatusBadge = ({ status }) => {
 
 export const AuditFindings = ({ findings, auditStatus, progress }) => {
     const [generating, setGenerating] = useState(false)
+    const [exportError, setExportError] = useState(null)
     const [webServer, setWebServer] = useState('Loading...')
     const { data: systemInfoData } = useDataQuery(systemInfoQuery)
 
     const generatePDFReport = async () => {
         setGenerating(true)
+        setExportError(null)
 
         try {
             const systemInfo = systemInfoData?.systemInfo || {}
@@ -258,7 +260,7 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
             document.body.removeChild(link)
             URL.revokeObjectURL(url)
         } catch (error) {
-            console.error('Error generating report:', error)
+            setExportError(error.message || i18n.t('Unknown error'))
         } finally {
             setGenerating(false)
         }
@@ -372,6 +374,14 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
 
                     {auditStatus === 'completed' && (
                         <div className={classes.reportButton}>
+                            {exportError && (
+                                <NoticeBox
+                                    error
+                                    title={i18n.t('Failed to generate report')}
+                                >
+                                    {exportError}
+                                </NoticeBox>
+                            )}
                             <Button
                                 onClick={generatePDFReport}
                                 disabled={generating}
