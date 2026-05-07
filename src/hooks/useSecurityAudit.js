@@ -4,15 +4,11 @@ import i18n from '@dhis2/d2-i18n'
 import { fetchAllPaged } from '../utils/pagination'
 import { parseDhis2Version, passwordLastUpdatedField } from '../utils/version'
 
-// Helper function to get the base URL for fetch requests
-const getApiUrl = (contextPath) => {
-    if (contextPath) {
-        // contextPath already includes the full URL like https://security.dhis2.thetechaid.org/dhis
-        return `${contextPath}/api/me`
-    }
-    // Fallback to relative URL
-    return '../api/me'
-}
+// Build a same-origin URL for /api/me, used by header checks that need the
+// raw fetch Response. `contextPath` (from /api/system/info) is the absolute
+// URL of the DHIS2 instance; if missing, fall back to a relative path.
+const getApiUrl = (contextPath) =>
+    contextPath ? `${contextPath}/api/me` : '../api/me'
 
 // Read passwordLastUpdated, falling back to the legacy nested path used pre-v42.
 const getPasswordLastUpdated = (user) =>
@@ -154,79 +150,6 @@ const getSecurityChecks = (config) => [
                 maxAllowed: config.maxSuperUserRoles || 5,
             }),
     },
-    // {
-    //     id: 'default-allowed-routes',
-    //     title: i18n.t('Default Allowed Routes'),
-    //     description: i18n.t('Checking for SSRF vulnerabilities in route configuration'),
-    //     ranking: 0,
-    //     query: {
-    //         settings: {
-    //             resource: 'systemSettings',
-    //             params: {
-    //                 key: ['keyDefaultBaseUrl'],
-    //             },
-    //         },
-    //     },
-    //     evaluate: (data) => {
-    //         const defaultBaseUrl = data.settings?.keyDefaultBaseUrl || ''
-
-    //         // Check if it's the dangerous default value
-    //         if (defaultBaseUrl === 'https://*') {
-    //             return {
-    //                 status: 'fail',
-    //                 message: 'Default allowed route is set to https://* - critical SSRF vulnerability!',
-    //                 details: 'Default allowed route URL https://* is vulnerable to server-side request forgery (SSRF) attacks. You should further restrict the default allowed route URL such that it contains no wildcards.',
-    //             }
-    //         }
-
-    //         // Check if empty (safe)
-    //         if (!defaultBaseUrl || defaultBaseUrl.trim() === '') {
-    //             return {
-    //                 status: 'pass',
-    //                 message: 'Default allowed route is empty',
-    //                 details: 'No default allowed route configured, which is safe.',
-    //             }
-    //         }
-
-    //         // Check if it has wildcards in the path
-    //         // Format: protocol://domain/path
-    //         const hasWildcard = defaultBaseUrl.includes('*')
-
-    //         if (hasWildcard) {
-    //             // Check if wildcard is only in domain (like https://*.example.com) or also in path
-    //             const urlParts = defaultBaseUrl.split('://')
-    //             if (urlParts.length === 2) {
-    //                 const afterProtocol = urlParts[1]
-    //                 const pathStartIndex = afterProtocol.indexOf('/')
-
-    //                 if (pathStartIndex > -1) {
-    //                     const pathPart = afterProtocol.substring(pathStartIndex)
-    //                     if (pathPart.includes('*')) {
-    //                         return {
-    //                             status: 'warning',
-    //                             message: 'Default allowed route contains wildcards in path',
-    //                             details: `Route: ${defaultBaseUrl}. Wildcards in the path increase SSRF risk. Consider restricting to specific URLs without wildcards.`,
-    //                         }
-    //                     }
-    //                 }
-
-    //                 // Wildcard only in domain
-    //                 return {
-    //                     status: 'warning',
-    //                     message: 'Default allowed route contains wildcards in domain',
-    //                     details: `Route: ${defaultBaseUrl}. While restricted by domain, wildcards still pose some SSRF risk. Consider using specific URLs.`,
-    //                 }
-    //             }
-    //         }
-
-    //         // No wildcards - safe
-    //         return {
-    //             status: 'pass',
-    //             message: 'Default allowed route is properly configured',
-    //             details: `Route: ${defaultBaseUrl}. No wildcards detected.`,
-    //         }
-    //     },
-    // },
     {
         id: 'impersonate-user-authority',
         title: i18n.t('Users Who Can Impersonate Others'),

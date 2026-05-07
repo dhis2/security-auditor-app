@@ -12,14 +12,7 @@ import { useAuditConfig } from '../hooks/useAuditConfig'
 import classes from './ConfigurationPanel.module.css'
 
 export const ConfigurationPanel = () => {
-    const {
-        config,
-        loading,
-        error,
-        updateConfigValue,
-        resetConfig,
-        saveConfig,
-    } = useAuditConfig()
+    const { config, loading, error, resetConfig, saveConfig } = useAuditConfig()
 
     const [localConfig, setLocalConfig] = useState(config)
     const [saving, setSaving] = useState(false)
