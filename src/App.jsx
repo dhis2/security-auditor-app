@@ -47,7 +47,10 @@ const MyApp = () => {
                         {i18n.t('Security Auditor')}
                     </h2>
                     <NoticeBox warning title={i18n.t('Administrator Access Required')}>
-                        {i18n.t('This tool is available for administrators only. You need the ALL or F_SYSTEM_SETTING authority to access the Security Auditor.')}
+                        {i18n.t(
+                            'This tool is available for administrators only. You need the {{authAll}} or {{authSystemSetting}} authority to access the Security Auditor.',
+                            { authAll: 'ALL', authSystemSetting: 'F_SYSTEM_SETTING' }
+                        )}
                     </NoticeBox>
                 </Card>
             </div>

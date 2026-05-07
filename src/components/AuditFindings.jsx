@@ -72,7 +72,6 @@ const StatusBadge = ({ status }) => {
 export const AuditFindings = ({ findings, auditStatus, progress }) => {
     const [generating, setGenerating] = useState(false)
     const [exportError, setExportError] = useState(null)
-    const [webServer, setWebServer] = useState('Loading...')
     const { data: systemInfoData } = useDataQuery(systemInfoQuery)
 
     const generatePDFReport = async () => {

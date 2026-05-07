@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-07T21:45:25.290Z\n"
-"PO-Revision-Date: 2026-05-07T21:45:25.290Z\n"
+"POT-Creation-Date: 2026-05-07T21:54:43.996Z\n"
+"PO-Revision-Date: 2026-05-07T21:54:43.996Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -19,6 +19,13 @@ msgstr "Security Auditor"
 
 msgid "Administrator Access Required"
 msgstr "Administrator Access Required"
+
+msgid ""
+"This tool is available for administrators only. You need the {{authAll}} or "
+"{{authSystemSetting}} authority to access the Security Auditor."
+msgstr ""
+"This tool is available for administrators only. You need the {{authAll}} or "
+"{{authSystemSetting}} authority to access the Security Auditor."
 
 msgid "Pass"
 msgstr "Pass"
@@ -410,12 +417,6 @@ msgstr "Memory"
 
 msgid "System Uptime"
 msgstr "System Uptime"
-
-msgctxt "SETTING authority to access the Security Auditor."
-msgid "This tool is available for administrators only. You need the ALL or F_SYSTEM"
-msgstr ""
-"This tool is available for administrators only. You need the ALL or "
-"F_SYSTEM_SETTING authority to access the Security Auditor."
 
 msgctxt "Application title"
 msgid "__MANIFEST_APP_TITLE"
