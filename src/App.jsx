@@ -4,6 +4,7 @@ import { useDataQuery } from '@dhis2/app-runtime'
 import { Card, NoticeBox, CircularLoader } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { SecurityAuditor } from './components/SecurityAuditor'
+import { AuditConfigProvider } from './hooks/useAuditConfig'
 
 const currentUserQuery = {
     me: {
@@ -53,7 +54,11 @@ const MyApp = () => {
         )
     }
 
-    return <SecurityAuditor />
+    return (
+        <AuditConfigProvider>
+            <SecurityAuditor />
+        </AuditConfigProvider>
+    )
 }
 
 export default MyApp

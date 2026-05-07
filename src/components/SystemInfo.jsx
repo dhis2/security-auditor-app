@@ -3,6 +3,7 @@ import { Card, CircularLoader, NoticeBox } from '@dhis2/ui'
 import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
 import { APP_VERSION as appVersion } from '../version'
+import { getServerHeader } from '../utils/instanceInfo'
 import { getSystemInfoItems } from '../utils/systemInfoItems'
 import classes from './SystemInfo.module.css'
 
@@ -17,26 +18,22 @@ export const SystemInfo = () => {
     const [webServer, setWebServer] = useState(i18n.t('Loading...'))
 
     useEffect(() => {
-        const fetchWebServerInfo = async () => {
-            try {
-                const contextPath = data?.systemInfo?.contextPath
-                const apiUrl = contextPath ? `${contextPath}/api/me` : '../api/me'
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
-                const serverHeader = response.headers.get('server')
-                setWebServer(serverHeader || i18n.t('Not disclosed'))
-            } catch (error) {
-                setWebServer(i18n.t('Unable to detect'))
-            }
+        if (!data?.systemInfo) {
+            return
         }
-
-        if (data?.systemInfo) {
-            fetchWebServerInfo()
+        let cancelled = false
+        getServerHeader(data.systemInfo.contextPath).then((header) => {
+            if (cancelled) {
+                return
+            }
+            setWebServer(
+                header === null
+                    ? i18n.t('Unable to detect')
+                    : header || i18n.t('Not disclosed')
+            )
+        })
+        return () => {
+            cancelled = true
         }
     }, [data])
 

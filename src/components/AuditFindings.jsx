@@ -15,7 +15,9 @@ import {
 import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
 import { APP_VERSION as appVersion } from '../version'
+import { downloadBlob } from '../utils/download'
 import { escapeHtml } from '../utils/html'
+import { getServerHeader } from '../utils/instanceInfo'
 import { getReportSystemInfoItems } from '../utils/systemInfoItems'
 import classes from './AuditFindings.module.css'
 
@@ -79,23 +81,11 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 
         try {
             const systemInfo = systemInfoData?.systemInfo || {}
-
-            // Fetch web server info
-            let serverHeader = 'Unable to detect'
-            try {
-                const contextPath = systemInfo.contextPath
-                const apiUrl = contextPath ? `${contextPath}/api/me` : '../api/me'
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
-                serverHeader = response.headers.get('server') || 'Not disclosed'
-            } catch (error) {
-                serverHeader = 'Unable to detect'
-            }
+            const fetchedHeader = await getServerHeader(systemInfo.contextPath)
+            const serverHeader =
+                fetchedHeader === null
+                    ? 'Unable to detect'
+                    : fetchedHeader || 'Not disclosed'
             const reportDate = new Date().toLocaleString()
 
             // Create HTML content for the report
@@ -249,16 +239,11 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
 </html>
 `
 
-            // Create blob and download
             const blob = new Blob([htmlContent], { type: 'text/html' })
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `dhis2-security-audit-${new Date().toISOString().split('T')[0]}.html`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
+            downloadBlob(
+                blob,
+                `dhis2-security-audit-${new Date().toISOString().split('T')[0]}.html`
+            )
         } catch (error) {
             setExportError(error.message || i18n.t('Unknown error'))
         } finally {

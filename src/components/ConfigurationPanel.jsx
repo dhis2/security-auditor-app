@@ -13,6 +13,7 @@ import {
     REQUIRED_CONFIG_KEYS,
     validateConfig,
 } from '../utils/configValidation'
+import { downloadBlob } from '../utils/download'
 import classes from './ConfigurationPanel.module.css'
 
 export const ConfigurationPanel = () => {
@@ -78,17 +79,13 @@ export const ConfigurationPanel = () => {
 
     const handleExport = () => {
         try {
-            const configJson = JSON.stringify(config, null, 2)
-            const blob = new Blob([configJson], { type: 'application/json' })
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `security-auditor-config-${new Date().toISOString().split('T')[0]}.json`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
-
+            const blob = new Blob([JSON.stringify(config, null, 2)], {
+                type: 'application/json',
+            })
+            downloadBlob(
+                blob,
+                `security-auditor-config-${new Date().toISOString().split('T')[0]}.json`
+            )
             setSaveMessage({ type: 'success', text: i18n.t('Configuration exported successfully') })
             setTimeout(() => setSaveMessage(null), 3000)
         } catch (err) {

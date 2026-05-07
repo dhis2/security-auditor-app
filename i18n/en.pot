@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2025-10-02T09:21:54.798Z\n"
-"PO-Revision-Date: 2025-10-02T09:21:54.798Z\n"
+"POT-Creation-Date: 2026-05-07T21:45:25.290Z\n"
+"PO-Revision-Date: 2026-05-07T21:45:25.290Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -19,13 +19,6 @@ msgstr "Security Auditor"
 
 msgid "Administrator Access Required"
 msgstr "Administrator Access Required"
-
-msgid ""
-"This tool is available for administrators only. You need the ALL authority "
-"to access the Security Auditor."
-msgstr ""
-"This tool is available for administrators only. You need the ALL authority "
-"to access the Security Auditor."
 
 msgid "Pass"
 msgstr "Pass"
@@ -41,6 +34,9 @@ msgstr "Running"
 
 msgid "Unknown"
 msgstr "Unknown"
+
+msgid "Unknown error"
+msgstr "Unknown error"
 
 msgid "Ready to audit"
 msgstr "Ready to audit"
@@ -80,6 +76,9 @@ msgstr "Status"
 
 msgid "Result"
 msgstr "Result"
+
+msgid "Failed to generate report"
+msgstr "Failed to generate report"
 
 msgid "Generating..."
 msgstr "Generating..."
@@ -205,80 +204,17 @@ msgstr "Console"
 msgid "Loading..."
 msgstr "Loading..."
 
-msgid "Not disclosed"
-msgstr "Not disclosed"
-
 msgid "Unable to detect"
 msgstr "Unable to detect"
+
+msgid "Not disclosed"
+msgstr "Not disclosed"
 
 msgid "Failed to load system information"
 msgstr "Failed to load system information"
 
-msgid "Security Auditor Version"
-msgstr "Security Auditor Version"
-
-msgid "Server URL"
-msgstr "Server URL"
-
-msgid "System ID"
-msgstr "System ID"
-
 msgid "N/A"
 msgstr "N/A"
-
-msgid "DHIS2 Version"
-msgstr "DHIS2 Version"
-
-msgid "DHIS2 Build Revision"
-msgstr "DHIS2 Build Revision"
-
-msgid "Build Time"
-msgstr "Build Time"
-
-msgid "Operating System"
-msgstr "Operating System"
-
-msgid "OS Architecture"
-msgstr "OS Architecture"
-
-msgid "OS Version"
-msgstr "OS Version"
-
-msgid "Java Version"
-msgstr "Java Version"
-
-msgid "Java Vendor"
-msgstr "Java Vendor"
-
-msgid "Java VM Name"
-msgstr "Java VM Name"
-
-msgid "Servlet Container"
-msgstr "Servlet Container"
-
-msgid "Web Server"
-msgstr "Web Server"
-
-msgid "Database Name"
-msgstr "Database Name"
-
-msgid "Database Version"
-msgstr "Database Version"
-
-msgid "Database User"
-msgstr "Database User"
-
-msgid "External Directory"
-msgstr "External Directory"
-
-msgid "CPU Cores"
-msgstr "CPU Cores"
-
-msgid "Memory"
-msgstr "Memory"
-
-msgid "System Uptime"
-msgstr "System Uptime"
 
 msgid "System Information"
 msgstr "System Information"
@@ -292,17 +228,11 @@ msgstr "Users With ALL Authority"
 msgid "Checking for users with administrative privileges"
 msgstr "Checking for users with administrative privileges"
 
-msgid "Users Who Can Manage Routes"
-msgstr "Users Who Can Manage Routes"
+msgid "Users Who Can Add Public Routes"
+msgstr "Users Who Can Add Public Routes"
 
-msgid "Checking for users with route management privileges"
-msgstr "Checking for users with route management privileges"
-
-msgid "Default Allowed Routes"
-msgstr "Default Allowed Routes"
-
-msgid "Checking for SSRF vulnerabilities in route configuration"
-msgstr "Checking for SSRF vulnerabilities in route configuration"
+msgid "Checking for users with route creation privileges"
+msgstr "Checking for users with route creation privileges"
 
 msgid "Users Who Can Impersonate Others"
 msgstr "Users Who Can Impersonate Others"
@@ -417,6 +347,75 @@ msgstr "Content Security Policy (CSP)"
 
 msgid "Checking for CSP header and violations"
 msgstr "Checking for CSP header and violations"
+
+msgid "Security Auditor Version"
+msgstr "Security Auditor Version"
+
+msgid "Server URL"
+msgstr "Server URL"
+
+msgid "System ID"
+msgstr "System ID"
+
+msgid "DHIS2 Version"
+msgstr "DHIS2 Version"
+
+msgid "DHIS2 Build Revision"
+msgstr "DHIS2 Build Revision"
+
+msgid "Build Time"
+msgstr "Build Time"
+
+msgid "Operating System"
+msgstr "Operating System"
+
+msgid "OS Architecture"
+msgstr "OS Architecture"
+
+msgid "OS Version"
+msgstr "OS Version"
+
+msgid "Java Version"
+msgstr "Java Version"
+
+msgid "Java Vendor"
+msgstr "Java Vendor"
+
+msgid "Java VM Name"
+msgstr "Java VM Name"
+
+msgid "Servlet Container"
+msgstr "Servlet Container"
+
+msgid "Web Server"
+msgstr "Web Server"
+
+msgid "Database Name"
+msgstr "Database Name"
+
+msgid "Database Version"
+msgstr "Database Version"
+
+msgid "Database User"
+msgstr "Database User"
+
+msgid "External Directory"
+msgstr "External Directory"
+
+msgid "CPU Cores"
+msgstr "CPU Cores"
+
+msgid "Memory"
+msgstr "Memory"
+
+msgid "System Uptime"
+msgstr "System Uptime"
+
+msgctxt "SETTING authority to access the Security Auditor."
+msgid "This tool is available for administrators only. You need the ALL or F_SYSTEM"
+msgstr ""
+"This tool is available for administrators only. You need the ALL or "
+"F_SYSTEM_SETTING authority to access the Security Auditor."
 
 msgctxt "Application title"
 msgid "__MANIFEST_APP_TITLE"

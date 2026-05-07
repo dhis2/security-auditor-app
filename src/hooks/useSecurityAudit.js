@@ -1,14 +1,9 @@
 import { useState, useCallback } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
+import { fetchApiMeHeaders } from '../utils/instanceInfo'
 import { fetchAllPaged } from '../utils/pagination'
 import { parseDhis2Version, passwordLastUpdatedField } from '../utils/version'
-
-// Build a same-origin URL for /api/me, used by header checks that need the
-// raw fetch Response. `contextPath` (from /api/system/info) is the absolute
-// URL of the DHIS2 instance; if missing, fall back to a relative path.
-const getApiUrl = (contextPath) =>
-    contextPath ? `${contextPath}/api/me` : '../api/me'
 
 // Read passwordLastUpdated, falling back to the legacy nested path used pre-v42.
 const getPasswordLastUpdated = (user) =>
@@ -914,14 +909,12 @@ export const useSecurityAudit = (config = {}) => {
 
         // Single fetch for response-header checks. Depends on systemInfo for
         // the contextPath; runs after the engine.query batch above so we can
-        // build the URL.
+        // build the URL. The same Promise is shared with SystemInfo and the
+        // report exporter via fetchApiMeHeaders' module-level cache.
         try {
-            const apiUrl = getApiUrl(ctx.systemInfo?.contextPath)
-            const response = await fetch(apiUrl, {
-                method: 'GET',
-                credentials: 'include',
-            })
-            ctx.responseHeaders = response.headers
+            ctx.responseHeaders = await fetchApiMeHeaders(
+                ctx.systemInfo?.contextPath
+            )
         } catch {
             // Network or CORS failure — checks fall back to the "unavailable" finding.
         }
