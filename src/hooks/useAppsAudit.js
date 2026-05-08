@@ -1,12 +1,14 @@
 import { useCallback, useState } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
 import { runAppsAudit } from '../audit/apps/runAppsAudit'
+import { useInstanceInfo } from './useInstanceInfo'
 
 // React state binding around runAppsAudit. Mirrors useSecurityAudit's shape:
 // the runner is pure and testable without React; this hook only handles
 // state updates and progress reporting.
 export const useAppsAudit = (config = {}) => {
     const engine = useDataEngine()
+    const { systemInfo } = useInstanceInfo()
     const [status, setStatus] = useState('idle') // idle, running, completed, error
     const [results, setResults] = useState([])
     const [progress, setProgress] = useState({ current: 0, total: 0 })
@@ -49,13 +51,18 @@ export const useAppsAudit = (config = {}) => {
             }
 
             try {
-                await runAppsAudit(engine, overrideConfig || config, callbacks)
+                await runAppsAudit(
+                    engine,
+                    overrideConfig || config,
+                    callbacks,
+                    { contextPath: systemInfo?.contextPath }
+                )
             } catch (err) {
                 setStatus('error')
                 setError(err.message || String(err))
             }
         },
-        [engine, config]
+        [engine, config, systemInfo?.contextPath]
     )
 
     return {

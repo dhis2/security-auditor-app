@@ -24,21 +24,21 @@ describe('runAppsAudit', () => {
             {
                 key: 'app-one',
                 name: 'App One',
-                baseUrl: 'api/apps/app-one',
+                baseUrl: 'https://server/dhis/api/apps/app-one',
             },
             {
                 key: 'app-two',
                 name: 'App Two',
-                baseUrl: 'api/apps/app-two',
+                baseUrl: 'https://server/dhis/api/apps/app-two',
             },
         ])
         const fetchText = makeFetchText({
-            'api/apps/app-one/index.html':
+            'https://server/dhis/api/apps/app-one/index.html':
                 '<script src="main.js"></script>',
-            'api/apps/app-one/main.js': 'console.log(1)',
-            'api/apps/app-two/index.html':
+            'https://server/dhis/api/apps/app-one/main.js': 'console.log(1)',
+            'https://server/dhis/api/apps/app-two/index.html':
                 '<script src="main.js"></script>',
-            'api/apps/app-two/main.js': 'console.log(2)',
+            'https://server/dhis/api/apps/app-two/main.js': 'console.log(2)',
         })
         const results = await runAppsAudit(engine, TEST_CONFIG, {}, {
             analyze: cleanAnalyze,
@@ -78,11 +78,12 @@ describe('runAppsAudit', () => {
 
     it('reports status: fail when an app contains obfuscated code', async () => {
         const engine = makeEngine([
-            { key: 'evil', baseUrl: 'api/apps/evil' },
+            { key: 'evil', baseUrl: 'https://server/dhis/api/apps/evil' },
         ])
         const fetchText = makeFetchText({
-            'api/apps/evil/index.html': '<script src="main.js"></script>',
-            'api/apps/evil/main.js': 'eval("...")',
+            'https://server/dhis/api/apps/evil/index.html':
+                '<script src="main.js"></script>',
+            'https://server/dhis/api/apps/evil/main.js': 'eval("...")',
         })
         const obfuscatedAnalyze = () => ({
             warnings: [{ kind: 'obfuscated-code', value: 'jsfuck' }],
@@ -99,11 +100,11 @@ describe('runAppsAudit', () => {
 
     it('isolates per-app failures (one bad app does not abort the run)', async () => {
         const engine = makeEngine([
-            { key: 'broken', baseUrl: 'api/apps/broken' },
-            { key: 'ok', baseUrl: 'api/apps/ok' },
+            { key: 'broken', baseUrl: 'https://server/dhis/api/apps/broken' },
+            { key: 'ok', baseUrl: 'https://server/dhis/api/apps/ok' },
         ])
         const fetchText = async (url) => {
-            if (url === 'api/apps/broken/index.html') {
+            if (url === 'https://server/dhis/api/apps/broken/index.html') {
                 throw new Error('Network down')
             }
             return '<html></html>'
@@ -121,9 +122,11 @@ describe('runAppsAudit', () => {
 
     it('emits the expected lifecycle callbacks', async () => {
         const events = []
-        const engine = makeEngine([{ key: 'a', baseUrl: 'api/apps/a' }])
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/dhis/api/apps/a' },
+        ])
         const fetchText = makeFetchText({
-            'api/apps/a/index.html': '<html></html>',
+            'https://server/dhis/api/apps/a/index.html': '<html></html>',
         })
         await runAppsAudit(
             engine,
@@ -146,6 +149,29 @@ describe('runAppsAudit', () => {
             'progress:1/1',
             'complete',
         ])
+    })
+
+    it('builds absolute paths via contextPath when app.baseUrl is missing', async () => {
+        // Regression: previously the fallback used a relative URL
+        // ("api/apps/<key>") which the browser resolved against the
+        // security-auditor's own document URL, producing a 404 on any
+        // instance mounted at a sub-path like /dhis. The fix is to use
+        // the supplied contextPath to build an absolute path.
+        const engine = makeEngine([
+            // Note: no baseUrl on the app object.
+            { key: 'no-base', name: 'No Base App' },
+        ])
+        const requested = []
+        const fetchText = async (url) => {
+            requested.push(url)
+            return '<html></html>'
+        }
+        await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            fetchText,
+            contextPath: '/dhis',
+        })
+        expect(requested).toContain('/dhis/api/apps/no-base/index.html')
     })
 
     it('handles a /api/apps fetch failure without throwing', async () => {
