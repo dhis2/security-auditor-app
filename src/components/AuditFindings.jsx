@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import {
     Card,
     NoticeBox,
@@ -12,20 +12,14 @@ import {
     TableCell,
     Button,
 } from '@dhis2/ui'
-import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
+import { useInstanceInfo } from '../hooks/useInstanceInfo'
 import { APP_VERSION as appVersion } from '../version'
 import { downloadBlob } from '../utils/download'
 import { escapeHtml } from '../utils/html'
 import { getServerHeader } from '../utils/instanceInfo'
 import { getReportSystemInfoItems } from '../utils/systemInfoItems'
 import classes from './AuditFindings.module.css'
-
-const systemInfoQuery = {
-    systemInfo: {
-        resource: 'system/info',
-    },
-}
 
 const StatusBadge = ({ status }) => {
     const getStatusConfig = (status) => {
@@ -72,19 +66,19 @@ const StatusBadge = ({ status }) => {
 export const AuditFindings = ({ findings, auditStatus, progress }) => {
     const [generating, setGenerating] = useState(false)
     const [exportError, setExportError] = useState(null)
-    const { data: systemInfoData } = useDataQuery(systemInfoQuery)
+    const { systemInfo: sharedSystemInfo } = useInstanceInfo()
 
     const generatePDFReport = async () => {
         setGenerating(true)
         setExportError(null)
 
         try {
-            const systemInfo = systemInfoData?.systemInfo || {}
+            const systemInfo = sharedSystemInfo || {}
             const fetchedHeader = await getServerHeader(systemInfo.contextPath)
             const serverHeader =
                 fetchedHeader === null
-                    ? 'Unable to detect'
-                    : fetchedHeader || 'Not disclosed'
+                    ? i18n.t('Unable to detect')
+                    : fetchedHeader || i18n.t('Not disclosed')
             const reportDate = new Date().toLocaleString()
 
             // Create HTML content for the report
@@ -93,7 +87,7 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>DHIS2 Security Audit Report</title>
+    <title>${escapeHtml(i18n.t('DHIS2 Security Audit Report'))}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -181,48 +175,55 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
     </style>
 </head>
 <body>
-    <h1>DHIS2 Security Audit Report</h1>
+    <h1>${escapeHtml(i18n.t('DHIS2 Security Audit Report'))}</h1>
     <div class="header-info">
-        <strong>Report Generated:</strong> ${escapeHtml(reportDate)}<br>
-        <strong>Total Checks:</strong> ${findings.length}<br>
-        <strong>Failed:</strong> ${findings.filter(f => f.status === 'fail').length}<br>
-        <strong>Warnings:</strong> ${findings.filter(f => f.status === 'warning').length}<br>
-        <strong>Passed:</strong> ${findings.filter(f => f.status === 'pass').length}
+        <strong>${escapeHtml(i18n.t('Report Generated:'))}</strong> ${escapeHtml(reportDate)}<br>
+        <strong>${escapeHtml(i18n.t('Total Checks:'))}</strong> ${findings.length}<br>
+        <strong>${escapeHtml(i18n.t('Failed:'))}</strong> ${findings.filter(f => f.status === 'fail').length}<br>
+        <strong>${escapeHtml(i18n.t('Warnings:'))}</strong> ${findings.filter(f => f.status === 'warning').length}<br>
+        <strong>${escapeHtml(i18n.t('Passed:'))}</strong> ${findings.filter(f => f.status === 'pass').length}
     </div>
 
-    <h2>System Information</h2>
+    <h2>${escapeHtml(i18n.t('System Information'))}</h2>
     <div class="system-info">
 ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
     .map(
         (item) => `        <div class="info-item">
             <div class="info-label">${escapeHtml(item.label)}</div>
-            <div class="info-value">${escapeHtml(item.value || 'N/A')}</div>
+            <div class="info-value">${escapeHtml(item.value || i18n.t('N/A'))}</div>
         </div>`
     )
     .join('\n')}
     </div>
 
-    <h2>Security Findings</h2>
+    <h2>${escapeHtml(i18n.t('Security Findings'))}</h2>
     <table>
         <thead>
             <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Result</th>
+                <th>${escapeHtml(i18n.t('Check'))}</th>
+                <th>${escapeHtml(i18n.t('Status'))}</th>
+                <th>${escapeHtml(i18n.t('Result'))}</th>
             </tr>
         </thead>
         <tbody>
 `
 
+            const STATUS_CLASSES = {
+                pass: 'status-pass',
+                warning: 'status-warning',
+                fail: 'status-fail',
+                error: 'status-error',
+            }
             findings.forEach((finding) => {
-                const statusClass = `status-${finding.status}`
+                const statusClass = STATUS_CLASSES[finding.status] || 'status-error'
+                const statusLabel = (finding.status || 'unknown').toUpperCase()
                 htmlContent += `
             <tr>
                 <td>
                     <strong>${escapeHtml(finding.title)}</strong><br>
                     <span style="font-size: 0.9em; color: #666;">${escapeHtml(finding.description)}</span>
                 </td>
-                <td class="${statusClass}">${escapeHtml(finding.status.toUpperCase())}</td>
+                <td class="${statusClass}">${escapeHtml(statusLabel)}</td>
                 <td>
                     ${escapeHtml(finding.message || '')}
                     ${finding.details ? `<div class="details">${escapeHtml(finding.details)}</div>` : ''}

@@ -1,10 +1,10 @@
-import React from 'react'
 import './locales'
 import { useDataQuery } from '@dhis2/app-runtime'
 import { Card, NoticeBox, CircularLoader } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { SecurityAuditor } from './components/SecurityAuditor'
 import { AuditConfigProvider } from './hooks/useAuditConfig'
+import { InstanceInfoProvider } from './hooks/useInstanceInfo'
 
 const currentUserQuery = {
     me: {
@@ -59,7 +59,9 @@ const MyApp = () => {
 
     return (
         <AuditConfigProvider>
-            <SecurityAuditor />
+            <InstanceInfoProvider>
+                <SecurityAuditor />
+            </InstanceInfoProvider>
         </AuditConfigProvider>
     )
 }

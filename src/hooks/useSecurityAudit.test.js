@@ -1,10 +1,11 @@
-import { getSecurityChecks } from './useSecurityAudit'
+import { getSecurityChecks } from '../audit/checks'
 
 const TEST_CONFIG = {
     minPasswordLength: 8,
     maxInactiveMonths: 3,
     maxPasswordAgeDays: 365,
     maxSuperUserRoles: 5,
+    maxAuditPages: 5000,
 }
 
 const findCheck = (id) =>
@@ -35,22 +36,22 @@ const headersWith = (entries) => ({
 // =============================================================================
 
 describe('authority checks (user-roles, route-manager, impersonate, system-setting)', () => {
-    it('returns "data unavailable" when ctx.privilegedRoles is null', () => {
+    it('returns "data unavailable" when prefetched users-by-authority is null', () => {
         const check = findCheck('user-roles')
-        const result = check.evaluate(
-            { users: [], unavailable: true },
-            { privilegedRoles: null }
-        )
+        const result = check.evaluate(null, {
+            privilegedRoles: null,
+            privilegedUsersByAuthority: null,
+        })
         expect(result.status).toBe('warning')
         expect(result.message).toMatch(/privileged role data unavailable/)
     })
 
-    it('reports zero holders cleanly', () => {
+    it('reports zero holders cleanly when no roles match', () => {
         const check = findCheck('user-roles')
-        const result = check.evaluate(
-            { users: [] },
-            { privilegedRoles: [] }
-        )
+        const result = check.evaluate(null, {
+            privilegedRoles: [],
+            privilegedUsersByAuthority: { ALL: [] },
+        })
         expect(result.status).toBe('pass')
         expect(result.message).toMatch(/No users with ALL authority/)
     })
@@ -61,14 +62,14 @@ describe('authority checks (user-roles, route-manager, impersonate, system-setti
             privilegedRoles: [
                 { id: 'r1', name: 'Superuser', authorities: ['ALL'] },
             ],
+            privilegedUsersByAuthority: {
+                ALL: [
+                    { id: 'u1', username: 'alice', userRoles: [{ id: 'r1', name: 'Superuser' }] },
+                    { id: 'u2', username: 'bob', userRoles: [{ id: 'r1', name: 'Superuser' }] },
+                ],
+            },
         }
-        const data = {
-            users: [
-                { id: 'u1', username: 'alice', userRoles: [{ id: 'r1', name: 'Superuser' }] },
-                { id: 'u2', username: 'bob', userRoles: [{ id: 'r1', name: 'Superuser' }] },
-            ],
-        }
-        const result = check.evaluate(data, ctx)
+        const result = check.evaluate(null, ctx)
         expect(result.status).toBe('pass')
         expect(result.details).toContain('alice')
         expect(result.details).toContain('bob')
@@ -80,15 +81,15 @@ describe('authority checks (user-roles, route-manager, impersonate, system-setti
             privilegedRoles: [
                 { id: 'r1', name: 'Superuser', authorities: ['ALL'] },
             ],
+            privilegedUsersByAuthority: {
+                ALL: Array.from({ length: 10 }, (_, i) => ({
+                    id: `u${i}`,
+                    username: `user${i}`,
+                    userRoles: [{ id: 'r1', name: 'Superuser' }],
+                })),
+            },
         }
-        const data = {
-            users: Array.from({ length: 10 }, (_, i) => ({
-                id: `u${i}`,
-                username: `user${i}`,
-                userRoles: [{ id: 'r1', name: 'Superuser' }],
-            })),
-        }
-        const result = check.evaluate(data, ctx)
+        const result = check.evaluate(null, ctx)
         expect(result.status).toBe('warning')
         expect(result.message).toMatch(/Found 10 users with ALL/)
     })
@@ -100,60 +101,21 @@ describe('authority checks (user-roles, route-manager, impersonate, system-setti
                 { id: 'r1', name: 'Routes', authorities: ['F_PUBLIC_ROUTE_ADD'] },
                 { id: 'r2', name: 'Old', authorities: ['M_routemanager'] },
             ],
+            privilegedUsersByAuthority: {
+                F_PUBLIC_ROUTE_ADD: [
+                    { id: 'u1', username: 'alice', userRoles: [{ id: 'r1', name: 'Routes' }] },
+                ],
+            },
         }
-        const data = {
-            users: [
-                { id: 'u1', username: 'alice', userRoles: [{ id: 'r1', name: 'Routes' }] },
-            ],
-        }
-        const result = check.evaluate(data, ctx)
+        const result = check.evaluate(null, ctx)
         expect(result.status).toBe('pass')
         expect(result.details).toContain('alice')
     })
 })
 
-describe('fetchAuthorityHolders (the fetch side of authority checks)', () => {
-    it('returns { unavailable: true } when prefetch failed', async () => {
-        const check = findCheck('user-roles')
-        const engine = makeEngine([])
-        const result = await check.fetch(engine, { privilegedRoles: null })
-        expect(result.unavailable).toBe(true)
-        expect(engine.query).not.toHaveBeenCalled()
-    })
-
-    it('returns empty users when no role grants the authority', async () => {
-        const check = findCheck('user-roles')
-        const engine = makeEngine([])
-        const result = await check.fetch(engine, {
-            privilegedRoles: [
-                { id: 'r1', authorities: ['F_SOME_OTHER_AUTH'] },
-            ],
-        })
-        expect(result.users).toEqual([])
-        expect(engine.query).not.toHaveBeenCalled()
-    })
-
-    it('issues a paged users query restricted to matching role IDs', async () => {
-        const check = findCheck('user-roles')
-        const engine = makeEngine([
-            {
-                __page: {
-                    users: [{ id: 'u1', username: 'alice', userRoles: [{ id: 'r1' }] }],
-                    pager: { page: 1, pageCount: 1, total: 1 },
-                },
-            },
-        ])
-        const result = await check.fetch(engine, {
-            privilegedRoles: [
-                { id: 'r1', authorities: ['ALL'] },
-                { id: 'r2', authorities: ['ALL', 'F_OTHER'] },
-            ],
-        })
-        expect(result.users).toHaveLength(1)
-        const queryArg = engine.query.mock.calls[0][0].__page
-        expect(queryArg.params.filter).toBe('userRoles.id:in:[r1,r2]')
-    })
-})
+// The old fetchAuthorityHolders fetch path was removed in favor of a single
+// shared users-fetch in buildAuditContext. The previous tests for the
+// fetch side now belong with the runner — see src/audit/runAudit.test.js.
 
 // =============================================================================
 // settings checks: shared prefetch (B1) + key-absence handling (A3)
@@ -338,6 +300,16 @@ describe('hsts-header (max-age validation)', () => {
         expect(result.message).toMatch(/missing or invalid/)
     })
 
+    it('rejects max-age with non-digit suffix (no false pass for "31536000abc")', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'strict-transport-security': 'max-age=31536000abc',
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/missing or invalid/)
+    })
+
     it('warns when max-age is zero (effectively disabling HSTS)', () => {
         const result = check().evaluate(null, {
             responseHeaders: headersWith({
@@ -383,14 +355,80 @@ describe('coop-header', () => {
 describe('csp-header (directive parsing, not just substring matching)', () => {
     const check = () => findCheck('csp-header')
 
-    it('passes for a strict policy', () => {
+    it('passes for a strict policy with all expected directives', () => {
         const result = check().evaluate(null, {
             responseHeaders: headersWith({
                 'content-security-policy':
-                    "default-src 'self'; script-src 'self'",
+                    "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
             }),
         })
         expect(result.status).toBe('pass')
+    })
+
+    it('warns when object-src is unset', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "script-src 'self'; base-uri 'self'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/object-src is unset/)
+    })
+
+    it('warns when base-uri is unset', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/base-uri is unset/)
+    })
+
+    it('warns when frame-ancestors is unset (clickjacking protection)', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/frame-ancestors is unset/)
+    })
+
+    it('warns when frame-ancestors contains a broad source', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors *",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/frame-ancestors contains a broad source/)
+    })
+
+    it('lowercases source values so case-mangled keywords are still flagged', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self' 'UNSAFE-INLINE'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/unsafe-inline/)
+    })
+
+    it("notes 'strict-dynamic' in details when present", () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self' 'strict-dynamic'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.status).toBe('pass')
+        expect(result.details).toMatch(/strict-dynamic/)
     })
 
     it('warns for default-src * (no false pass)', () => {
@@ -463,7 +501,7 @@ describe('csp-header (directive parsing, not just substring matching)', () => {
         const result = check().evaluate(null, {
             responseHeaders: headersWith({
                 'content-security-policy':
-                    "default-src 'self' 'unsafe-inline'; script-src 'self'",
+                    "default-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
             }),
         })
         expect(result.status).toBe('pass')
@@ -642,6 +680,31 @@ describe('default-admin-password (heuristic: never-set OR matches created)', () 
 // =============================================================================
 // users-never-logged-in & users-inactive-3-months (server-side filters)
 // =============================================================================
+
+describe('maxAuditPages threshold flows through to pagination', () => {
+    it('uses config.maxAuditPages as the page-cap when fetching never-logged-in users', async () => {
+        // A "runaway" engine returns pageCount: 9999 forever. With maxPages=3,
+        // fetchAllPaged should throw on the 4th iteration.
+        const runawayEngine = {
+            query: jest.fn(async () => ({
+                __page: {
+                    users: [{ id: 'u' }],
+                    pager: { page: 1, pageCount: 9999, total: 0 },
+                },
+            })),
+        }
+        const tightConfig = { ...TEST_CONFIG, maxAuditPages: 3 }
+        const check = getSecurityChecks(tightConfig).find(
+            (c) => c.id === 'users-never-logged-in'
+        )
+        await expect(check.fetch(runawayEngine)).rejects.toThrow(
+            /exceeded maxPages \(3\)/
+        )
+    })
+
+    // The authority-fetch maxPages flow is now exercised in
+    // src/audit/runAudit.test.js since buildAuditContext owns the fetch.
+})
 
 describe('users-never-logged-in', () => {
     it('issues a paged query filtered by lastLogin:null', async () => {

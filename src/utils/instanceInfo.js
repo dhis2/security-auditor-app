@@ -2,26 +2,31 @@
 // audit runner, the SystemInfo panel, and the report exporter) all need the
 // `server` header — without this helper, each does its own fetch.
 //
-// The Promise is memoized so concurrent callers await the same network roundtrip.
-// On failure the cache is cleared so a later caller can retry.
+// The Promise is memoized per resolved URL so concurrent callers for the same
+// instance share one network roundtrip. Keying by URL (not just "is something
+// cached?") protects against the rare but real case where the same session
+// observes two different `contextPath` values.
+// On failure the entry for that URL is cleared so a later caller can retry.
 
-let headersPromise = null
+const headerPromisesByUrl = new Map()
 
 const buildApiMeUrl = (contextPath) =>
     contextPath ? `${contextPath}/api/me` : '../api/me'
 
 export const fetchApiMeHeaders = (contextPath) => {
-    if (headersPromise) {
-        return headersPromise
-    }
     const url = buildApiMeUrl(contextPath)
-    headersPromise = fetch(url, { method: 'GET', credentials: 'include' })
+    const cached = headerPromisesByUrl.get(url)
+    if (cached) {
+        return cached
+    }
+    const promise = fetch(url, { method: 'GET', credentials: 'include' })
         .then((response) => response.headers)
         .catch((err) => {
-            headersPromise = null
+            headerPromisesByUrl.delete(url)
             throw err
         })
-    return headersPromise
+    headerPromisesByUrl.set(url, promise)
+    return promise
 }
 
 // Convenience: read the `server` response header. Returns null on any error
@@ -35,7 +40,7 @@ export const getServerHeader = async (contextPath) => {
     }
 }
 
-// Test seam — clears the memoized Promise. Not used in production code.
+// Test seam — clears the memoized Promises. Not used in production code.
 export const __resetApiMeCache = () => {
-    headersPromise = null
+    headerPromisesByUrl.clear()
 }

@@ -1,18 +1,22 @@
-import React, {
+import {
     createContext,
     useContext,
     useState,
     useEffect,
     useCallback,
+    useMemo,
 } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
+import i18n from '@dhis2/d2-i18n'
 
-// Default configuration values
-const DEFAULT_CONFIG = {
+// Default configuration values. Exported so the import-config flow can merge
+// older JSON exports (which may pre-date newer keys) with current defaults.
+export const DEFAULT_CONFIG = {
     minPasswordLength: 8,
     maxInactiveMonths: 3,
     maxPasswordAgeDays: 365,
     maxSuperUserRoles: 5,
+    maxAuditPages: 5000,
 }
 
 // DataStore namespace for the app
@@ -62,12 +66,14 @@ export const AuditConfigProvider = ({ children }) => {
                         return { success: true }
                     } catch (createErr) {
                         const message =
-                            createErr.message || 'Failed to create configuration'
+                            createErr.message ||
+                            i18n.t('Failed to create configuration')
                         setError(message)
                         return { success: false, error: message }
                     }
                 }
-                const message = err.message || 'Failed to save configuration'
+                const message =
+                    err.message || i18n.t('Failed to save configuration')
                 setError(message)
                 return { success: false, error: message }
             }
@@ -92,7 +98,7 @@ export const AuditConfigProvider = ({ children }) => {
                 setConfig(DEFAULT_CONFIG)
                 return DEFAULT_CONFIG
             }
-            setError(err.message || 'Failed to load configuration')
+            setError(err.message || i18n.t('Failed to load configuration'))
             return DEFAULT_CONFIG
         } finally {
             setLoading(false)
@@ -109,14 +115,20 @@ export const AuditConfigProvider = ({ children }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const value = {
-        config,
-        loading,
-        error,
-        saveConfig,
-        resetConfig,
-        reloadConfig: loadConfig,
-    }
+    // Memoized so consumers like useSecurityAudit can safely include the
+    // returned value in dependency arrays without recreating callbacks on
+    // every provider render.
+    const value = useMemo(
+        () => ({
+            config,
+            loading,
+            error,
+            saveConfig,
+            resetConfig,
+            reloadConfig: loadConfig,
+        }),
+        [config, loading, error, saveConfig, resetConfig, loadConfig]
+    )
 
     return (
         <AuditConfigContext.Provider value={value}>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
     Card,
     Button,
@@ -8,7 +8,7 @@ import {
     CircularLoader,
 } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
-import { useAuditConfig } from '../hooks/useAuditConfig'
+import { DEFAULT_CONFIG, useAuditConfig } from '../hooks/useAuditConfig'
 import {
     REQUIRED_CONFIG_KEYS,
     validateConfig,
@@ -23,17 +23,36 @@ export const ConfigurationPanel = () => {
     const [saving, setSaving] = useState(false)
     const [saveMessage, setSaveMessage] = useState(null)
     const fileInputRef = useRef(null)
+    const messageTimerRef = useRef(null)
 
     // Update local config when global config changes
     useEffect(() => {
         setLocalConfig(config)
     }, [config])
 
-    // Show a transient feedback message; auto-clears after `timeoutMs`.
+    // Show a transient feedback message; auto-clears after `timeoutMs`. Cancels
+    // any pending clear-timer so successive calls don't blank out a newer
+    // message early. The cleanup effect below clears the timer on unmount so
+    // we don't `setState` on an unmounted component.
     const flashMessage = useCallback((message, timeoutMs = 3000) => {
+        if (messageTimerRef.current) {
+            clearTimeout(messageTimerRef.current)
+        }
         setSaveMessage(message)
-        setTimeout(() => setSaveMessage(null), timeoutMs)
+        messageTimerRef.current = setTimeout(() => {
+            setSaveMessage(null)
+            messageTimerRef.current = null
+        }, timeoutMs)
     }, [])
+
+    useEffect(
+        () => () => {
+            if (messageTimerRef.current) {
+                clearTimeout(messageTimerRef.current)
+            }
+        },
+        []
+    )
 
     const handleChange = (key, value) => {
         setLocalConfig((prev) => ({ ...prev, [key]: parseInt(value, 10) }))
@@ -48,10 +67,7 @@ export const ConfigurationPanel = () => {
         }
 
         setSaving(true)
-        setSaveMessage(null)
-
         const result = await saveConfig(localConfig)
-
         flashMessage(
             result.success
                 ? { type: 'success', text: i18n.t('Configuration saved successfully') }
@@ -62,10 +78,7 @@ export const ConfigurationPanel = () => {
 
     const handleReset = async () => {
         setSaving(true)
-        setSaveMessage(null)
-
         const result = await resetConfig()
-
         flashMessage(
             result.success
                 ? { type: 'success', text: i18n.t('Configuration reset to defaults') }
@@ -94,30 +107,43 @@ export const ConfigurationPanel = () => {
         if (!file) return
 
         setSaving(true)
-        setSaveMessage(null)
 
         try {
             const text = await file.text()
             const importedConfig = JSON.parse(text)
 
-            const missingKeys = REQUIRED_CONFIG_KEYS.filter(
-                (key) => !(key in importedConfig)
-            )
-            if (missingKeys.length > 0) {
+            if (!importedConfig || typeof importedConfig !== 'object') {
                 throw new Error(
-                    `Missing fields: ${missingKeys.join(', ')}`
+                    i18n.t('Imported file is not a valid configuration object')
                 )
             }
 
-            const errors = validateConfig(importedConfig)
+            // Sanity check: the file should contain at least one recognized key.
+            // Rejects unrelated JSON without rejecting older exports that simply
+            // pre-date a more recent config field (those are upgraded via the
+            // DEFAULT_CONFIG merge below).
+            const hasAnyKnownKey = REQUIRED_CONFIG_KEYS.some(
+                (key) => key in importedConfig
+            )
+            if (!hasAnyKnownKey) {
+                throw new Error(
+                    i18n.t('No recognized configuration fields found')
+                )
+            }
+
+            // Merge with defaults so missing keys (e.g. from an older export)
+            // get filled in automatically.
+            const mergedConfig = { ...DEFAULT_CONFIG, ...importedConfig }
+
+            const errors = validateConfig(mergedConfig)
             if (errors.length > 0) {
                 throw new Error(errors.join('. '))
             }
 
-            const result = await saveConfig(importedConfig)
+            const result = await saveConfig(mergedConfig)
 
             if (result.success) {
-                setLocalConfig(importedConfig)
+                setLocalConfig(mergedConfig)
                 flashMessage({ type: 'success', text: i18n.t('Configuration imported successfully') })
             } else {
                 flashMessage({ type: 'error', text: i18n.t('Failed to save imported configuration') })
@@ -205,13 +231,27 @@ export const ConfigurationPanel = () => {
                 />
 
                 <InputField
-                    label={i18n.t('Maximum Super User Roles')}
+                    label={i18n.t('Maximum Privileged Users')}
                     type="number"
                     min="1"
                     max="50"
                     value={String(localConfig.maxSuperUserRoles)}
                     onChange={({ value }) => handleChange('maxSuperUserRoles', value)}
-                    helpText={i18n.t('Maximum number of user roles with ALL authorities before warning')}
+                    helpText={i18n.t(
+                        'Threshold for the number of users holding privileged authorities (ALL, F_PUBLIC_ROUTE_ADD, F_IMPERSONATE_USER, or F_SYSTEM_SETTING) before a warning is raised'
+                    )}
+                />
+
+                <InputField
+                    label={i18n.t('Maximum Audit Pages Per Query')}
+                    type="number"
+                    min="100"
+                    max="50000"
+                    value={String(localConfig.maxAuditPages)}
+                    onChange={({ value }) => handleChange('maxAuditPages', value)}
+                    helpText={i18n.t(
+                        'Hard cap on how many pages a single audit query will fetch. With the default page size of 200, 5000 pages allows up to 1,000,000 matched rows. Raise for very large instances; lower as a defensive limit.'
+                    )}
                 />
             </div>
 

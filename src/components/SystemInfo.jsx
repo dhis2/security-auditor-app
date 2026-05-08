@@ -1,28 +1,22 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CircularLoader, NoticeBox } from '@dhis2/ui'
-import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
+import { useInstanceInfo } from '../hooks/useInstanceInfo'
 import { APP_VERSION as appVersion } from '../version'
 import { getServerHeader } from '../utils/instanceInfo'
 import { getSystemInfoItems } from '../utils/systemInfoItems'
 import classes from './SystemInfo.module.css'
 
-const query = {
-    systemInfo: {
-        resource: 'system/info',
-    },
-}
-
 export const SystemInfo = () => {
-    const { loading, error, data } = useDataQuery(query)
+    const { loading, error, systemInfo } = useInstanceInfo()
     const [webServer, setWebServer] = useState(i18n.t('Loading...'))
 
     useEffect(() => {
-        if (!data?.systemInfo) {
+        if (!systemInfo) {
             return
         }
         let cancelled = false
-        getServerHeader(data.systemInfo.contextPath).then((header) => {
+        getServerHeader(systemInfo.contextPath).then((header) => {
             if (cancelled) {
                 return
             }
@@ -35,7 +29,7 @@ export const SystemInfo = () => {
         return () => {
             cancelled = true
         }
-    }, [data])
+    }, [systemInfo])
 
     if (loading) {
         return (
@@ -55,14 +49,14 @@ export const SystemInfo = () => {
         )
     }
 
-    const systemInfo = data?.systemInfo || {}
     const naLabel = i18n.t('N/A')
-    const infoItems = getSystemInfoItems(systemInfo, { webServer, appVersion }).map(
-        (item) => ({
-            label: item.label,
-            value: item.value || naLabel,
-        })
-    )
+    const infoItems = getSystemInfoItems(systemInfo || {}, {
+        webServer,
+        appVersion,
+    }).map((item) => ({
+        label: item.label,
+        value: item.value || naLabel,
+    }))
 
     return (
         <Card className={classes.card}>
