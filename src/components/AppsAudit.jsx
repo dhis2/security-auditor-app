@@ -175,14 +175,16 @@ export const AppsAudit = ({
         return (
             <div className={classes.container}>
                 <Card className={classes.card}>
-                    <h3>{i18n.t('Apps Audit')}</h3>
-                    <p>
-                        {i18n.t(
-                            'Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious JavaScript. Each app is fetched from this server and analyzed locally; nothing is uploaded externally.'
-                        )}
-                    </p>
-                    <div className={classes.actions}>
-                        <Button primary onClick={onStart}>
+                    <div className={classes.cardHeaderRow}>
+                        <div className={classes.cardHeaderText}>
+                            <h3>{i18n.t('Apps Audit')}</h3>
+                            <p>
+                                {i18n.t(
+                                    'Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious JavaScript. Each app is fetched from this server and analyzed locally; nothing is uploaded externally.'
+                                )}
+                            </p>
+                        </div>
+                        <Button primary large onClick={onStart}>
                             {i18n.t('Start Apps Audit')}
                         </Button>
                     </div>

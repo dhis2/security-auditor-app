@@ -16,6 +16,29 @@
     margin-top: 8px;
 }
 
+/* Card-internal header row: title/description on the left, primary action
+ * button flush to the right. Used for the "start" idle state and matches
+ * the layout used by AuditFindings so both audit cards align visually. */
+.cardHeaderRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.cardHeaderText {
+    flex: 1;
+    min-width: 0;
+}
+
+.cardHeaderText h3 {
+    margin: 0 0 8px 0;
+}
+
+.cardHeaderText p {
+    margin: 0;
+}
+
 .progressLabel {
     font-size: 13px;
     color: #4a4a4a;
