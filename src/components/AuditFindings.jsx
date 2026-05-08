@@ -68,7 +68,7 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
     const [exportError, setExportError] = useState(null)
     const { systemInfo: sharedSystemInfo } = useInstanceInfo()
 
-    const generatePDFReport = async () => {
+    const generateHtmlReport = async () => {
         setGenerating(true)
         setExportError(null)
 
@@ -368,7 +368,7 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
                                 </NoticeBox>
                             )}
                             <Button
-                                onClick={generatePDFReport}
+                                onClick={generateHtmlReport}
                                 disabled={generating}
                             >
                                 {generating
