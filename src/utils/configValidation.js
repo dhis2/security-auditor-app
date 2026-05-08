@@ -34,6 +34,11 @@ const RULES = {
         min: 100,
         max: 50000,
     },
+    maxAppAuditConcurrency: {
+        getLabel: () => i18n.t('Apps audit concurrency'),
+        min: 1,
+        max: 16,
+    },
 }
 
 export const REQUIRED_CONFIG_KEYS = Object.keys(RULES)

@@ -7,6 +7,7 @@ const TEST_CONFIG = {
     maxPasswordAgeDays: 365,
     maxSuperUserRoles: 5,
     maxAuditPages: 5000,
+    maxAppAuditConcurrency: 4,
 }
 
 beforeEach(() => {

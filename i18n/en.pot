@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-08T21:50:28.608Z\n"
-"PO-Revision-Date: 2026-05-08T21:50:28.608Z\n"
+"POT-Creation-Date: 2026-05-08T22:23:47.031Z\n"
+"PO-Revision-Date: 2026-05-08T22:23:47.031Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -526,11 +526,75 @@ msgstr "Warning"
 msgid "Fail"
 msgstr "Fail"
 
-msgid "Running"
-msgstr "Running"
+msgid "Info"
+msgstr "Info"
 
 msgid "Unknown"
 msgstr "Unknown"
+
+msgid "{{current}} of {{total}} apps scanned"
+msgstr "{{current}} of {{total}} apps scanned"
+
+msgid "Hide"
+msgstr "Hide"
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Skipped ({{reason}})"
+msgstr "Skipped ({{reason}})"
+
+msgid "Apps Audit"
+msgstr "Apps Audit"
+
+msgid ""
+"Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious "
+"JavaScript. Each app is fetched from this server and analyzed locally; "
+"nothing is uploaded externally."
+msgstr ""
+"Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious "
+"JavaScript. Each app is fetched from this server and analyzed locally; "
+"nothing is uploaded externally."
+
+msgid "Start Apps Audit"
+msgstr "Start Apps Audit"
+
+msgid "Apps Audit failed"
+msgstr "Apps Audit failed"
+
+msgid ""
+"Could not list installed apps. The user may lack permission to read "
+"/api/apps."
+msgstr ""
+"Could not list installed apps. The user may lack permission to read "
+"/api/apps."
+
+msgid "Re-run Apps Audit"
+msgstr "Re-run Apps Audit"
+
+msgid "Apps Audit completed"
+msgstr "Apps Audit completed"
+
+msgid "Found {{failures}} app(s) with failing findings. Review the details below."
+msgstr "Found {{failures}} app(s) with failing findings. Review the details below."
+
+msgid "Apps Audit completed with {{warnings}} warning(s). Review recommended."
+msgstr "Apps Audit completed with {{warnings}} warning(s). Review recommended."
+
+msgid "All scanned apps look clean."
+msgstr "All scanned apps look clean."
+
+msgid "App"
+msgstr "App"
+
+msgid "Version"
+msgstr "Version"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Running"
+msgstr "Running"
 
 msgid "Unable to detect"
 msgstr "Unable to detect"
@@ -553,23 +617,26 @@ msgstr "Security Findings"
 msgid "Check"
 msgstr "Check"
 
-msgid "Status"
-msgstr "Status"
-
 msgid "Result"
 msgstr "Result"
 
 msgid "Ready to audit"
 msgstr "Ready to audit"
 
-msgid "Click \"Start Audit\" to begin the security assessment."
-msgstr "Click \"Start Audit\" to begin the security assessment."
+msgid "Click Start DHIS2 Audit to begin the security assessment."
+msgstr "Click Start DHIS2 Audit to begin the security assessment."
+
+msgid "Start DHIS2 Audit"
+msgstr "Start DHIS2 Audit"
 
 msgid "Audit Error"
 msgstr "Audit Error"
 
 msgid "An error occurred while running the security audit. Please try again."
 msgstr "An error occurred while running the security audit. Please try again."
+
+msgid "Re-run DHIS2 Audit"
+msgstr "Re-run DHIS2 Audit"
 
 msgid "Audit in Progress"
 msgstr "Audit in Progress"
@@ -673,6 +740,16 @@ msgstr ""
 "default page size of 200, 5000 pages allows up to 1,000,000 matched rows. "
 "Raise for very large instances; lower as a defensive limit."
 
+msgid "Apps Audit Concurrency"
+msgstr "Apps Audit Concurrency"
+
+msgid ""
+"Number of installed apps scanned in parallel by the Apps Audit. Higher "
+"values fetch faster but use more CPU during obfuscation analysis."
+msgstr ""
+"Number of installed apps scanned in parallel by the Apps Audit. Higher "
+"values fetch faster but use more CPU during obfuscation analysis."
+
 msgid "Saving..."
 msgstr "Saving..."
 
@@ -710,14 +787,8 @@ msgstr ""
 "Analyze your DHIS2 instance for security vulnerabilities and configuration "
 "issues"
 
-msgid "Auditing..."
-msgstr "Auditing..."
-
-msgid "Start Audit"
-msgstr "Start Audit"
-
-msgid "Audit Results"
-msgstr "Audit Results"
+msgid "DHIS2 Audit"
+msgstr "DHIS2 Audit"
 
 msgid "Configuration"
 msgstr "Configuration"
@@ -757,6 +828,9 @@ msgstr "Maximum users with privileged authorities"
 
 msgid "Maximum audit pages per query"
 msgstr "Maximum audit pages per query"
+
+msgid "Apps audit concurrency"
+msgstr "Apps audit concurrency"
 
 msgid "Configuration must be an object"
 msgstr "Configuration must be an object"

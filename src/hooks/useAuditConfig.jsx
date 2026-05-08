@@ -17,6 +17,7 @@ export const DEFAULT_CONFIG = {
     maxPasswordAgeDays: 365,
     maxSuperUserRoles: 5,
     maxAuditPages: 5000,
+    maxAppAuditConcurrency: 4,
 }
 
 // DataStore namespace for the app

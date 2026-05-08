@@ -6,6 +6,7 @@ const validConfig = {
     maxPasswordAgeDays: 365,
     maxSuperUserRoles: 5,
     maxAuditPages: 5000,
+    maxAppAuditConcurrency: 4,
 }
 
 describe('validateConfig', () => {
@@ -54,19 +55,21 @@ describe('validateConfig', () => {
             maxPasswordAgeDays: 365,
             maxSuperUserRoles: 5,
             maxAuditPages: 5000,
+            maxAppAuditConcurrency: 4,
         })
         expect(errors).toHaveLength(2)
     })
 })
 
 describe('REQUIRED_CONFIG_KEYS', () => {
-    it('lists exactly the five expected keys', () => {
+    it('lists exactly the six expected keys', () => {
         expect(REQUIRED_CONFIG_KEYS).toEqual([
             'minPasswordLength',
             'maxInactiveMonths',
             'maxPasswordAgeDays',
             'maxSuperUserRoles',
             'maxAuditPages',
+            'maxAppAuditConcurrency',
         ])
     })
 })

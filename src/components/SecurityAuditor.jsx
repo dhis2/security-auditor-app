@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Button, Card, Tab, TabBar } from '@dhis2/ui'
+import { Card, Tab, TabBar } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { useSecurityAudit } from '../hooks/useSecurityAudit'
 import { useAuditConfig } from '../hooks/useAuditConfig'
+import { useAppsAudit } from '../hooks/useAppsAudit'
 import { AuditFindings } from './AuditFindings'
+import { AppsAudit } from './AppsAudit'
 import { ConfigurationPanel } from './ConfigurationPanel'
 import { SystemInfo } from './SystemInfo'
 import { Console } from './Console'
@@ -11,16 +13,19 @@ import classes from './SecurityAuditor.module.css'
 
 export const SecurityAuditor = () => {
     const { config } = useAuditConfig()
-    const { auditStatus, findings, progress, runAudit, apiResponses } = useSecurityAudit(config)
+    const { auditStatus, findings, progress, runAudit, apiResponses } =
+        useSecurityAudit(config)
+    const apps = useAppsAudit(config)
     const [activeTab, setActiveTab] = useState('audit')
 
-    const isRunning = auditStatus === 'running'
-
     const handleStartAudit = () => {
-        // The provider holds the canonical config — it's already fresh because
-        // ConfigurationPanel saves through the same provider.
         setActiveTab('audit')
         runAudit(config)
+    }
+
+    const handleStartAppsAudit = () => {
+        setActiveTab('apps')
+        apps.runAppsAudit(config)
     }
 
     return (
@@ -37,16 +42,6 @@ export const SecurityAuditor = () => {
                             )}
                         </p>
                     </div>
-                    <Button
-                        primary
-                        large
-                        onClick={handleStartAudit}
-                        disabled={isRunning}
-                    >
-                        {isRunning
-                            ? i18n.t('Auditing...')
-                            : i18n.t('Start Audit')}
-                    </Button>
                 </div>
             </Card>
 
@@ -55,7 +50,13 @@ export const SecurityAuditor = () => {
                     selected={activeTab === 'audit'}
                     onClick={() => setActiveTab('audit')}
                 >
-                    {i18n.t('Audit Results')}
+                    {i18n.t('DHIS2 Audit')}
+                </Tab>
+                <Tab
+                    selected={activeTab === 'apps'}
+                    onClick={() => setActiveTab('apps')}
+                >
+                    {i18n.t('Apps Audit')}
                 </Tab>
                 <Tab
                     selected={activeTab === 'config'}
@@ -82,6 +83,18 @@ export const SecurityAuditor = () => {
                     findings={findings}
                     auditStatus={auditStatus}
                     progress={progress}
+                    onStartAudit={handleStartAudit}
+                />
+            )}
+
+            {activeTab === 'apps' && (
+                <AppsAudit
+                    status={apps.status}
+                    results={apps.results}
+                    progress={apps.progress}
+                    currentAppKey={apps.currentAppKey}
+                    error={apps.error}
+                    onStart={handleStartAppsAudit}
                 />
             )}
 

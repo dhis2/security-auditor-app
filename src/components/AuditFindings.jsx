@@ -63,7 +63,7 @@ const StatusBadge = ({ status }) => {
     )
 }
 
-export const AuditFindings = ({ findings, auditStatus, progress }) => {
+export const AuditFindings = ({ findings, auditStatus, progress, onStartAudit }) => {
     const [generating, setGenerating] = useState(false)
     const [exportError, setExportError] = useState(null)
     const { systemInfo: sharedSystemInfo } = useInstanceInfo()
@@ -253,21 +253,39 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
 
     if (auditStatus === 'idle') {
         return (
-            <NoticeBox title={i18n.t('Ready to audit')}>
-                {i18n.t(
-                    'Click "Start Audit" to begin the security assessment.'
+            <div className={classes.container}>
+                <NoticeBox title={i18n.t('Ready to audit')}>
+                    {i18n.t(
+                        'Click Start DHIS2 Audit to begin the security assessment.'
+                    )}
+                </NoticeBox>
+                {onStartAudit && (
+                    <div className={classes.reportButton}>
+                        <Button primary large onClick={onStartAudit}>
+                            {i18n.t('Start DHIS2 Audit')}
+                        </Button>
+                    </div>
                 )}
-            </NoticeBox>
+            </div>
         )
     }
 
     if (auditStatus === 'error') {
         return (
-            <NoticeBox error title={i18n.t('Audit Error')}>
-                {i18n.t(
-                    'An error occurred while running the security audit. Please try again.'
+            <div className={classes.container}>
+                <NoticeBox error title={i18n.t('Audit Error')}>
+                    {i18n.t(
+                        'An error occurred while running the security audit. Please try again.'
+                    )}
+                </NoticeBox>
+                {onStartAudit && (
+                    <div className={classes.reportButton}>
+                        <Button onClick={onStartAudit}>
+                            {i18n.t('Re-run DHIS2 Audit')}
+                        </Button>
+                    </div>
                 )}
-            </NoticeBox>
+            </div>
         )
     }
 
@@ -375,6 +393,11 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
                                     ? i18n.t('Generating...')
                                     : i18n.t('Save Report')}
                             </Button>
+                            {onStartAudit && (
+                                <Button onClick={onStartAudit}>
+                                    {i18n.t('Re-run DHIS2 Audit')}
+                                </Button>
+                            )}
                         </div>
                     )}
                 </>
