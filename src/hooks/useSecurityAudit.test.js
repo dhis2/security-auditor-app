@@ -339,6 +339,16 @@ describe('hsts-header (max-age validation)', () => {
         expect(result.message).toMatch(/missing or invalid/)
     })
 
+    it('rejects max-age with non-digit suffix (no false pass for "31536000abc")', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'strict-transport-security': 'max-age=31536000abc',
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/missing or invalid/)
+    })
+
     it('warns when max-age is zero (effectively disabling HSTS)', () => {
         const result = check().evaluate(null, {
             responseHeaders: headersWith({
@@ -384,14 +394,69 @@ describe('coop-header', () => {
 describe('csp-header (directive parsing, not just substring matching)', () => {
     const check = () => findCheck('csp-header')
 
-    it('passes for a strict policy', () => {
+    it('passes for a strict policy with all expected directives', () => {
         const result = check().evaluate(null, {
             responseHeaders: headersWith({
                 'content-security-policy':
-                    "default-src 'self'; script-src 'self'",
+                    "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
             }),
         })
         expect(result.status).toBe('pass')
+    })
+
+    it('warns when object-src is unset', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "script-src 'self'; base-uri 'self'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/object-src is unset/)
+    })
+
+    it('warns when base-uri is unset', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/base-uri is unset/)
+    })
+
+    it('warns when frame-ancestors is unset (clickjacking protection)', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/frame-ancestors is unset/)
+    })
+
+    it('warns when frame-ancestors contains a broad source', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors *",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/frame-ancestors contains a broad source/)
+    })
+
+    it("notes 'strict-dynamic' in details when present", () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self' 'strict-dynamic'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.status).toBe('pass')
+        expect(result.details).toMatch(/strict-dynamic/)
     })
 
     it('warns for default-src * (no false pass)', () => {
@@ -464,7 +529,7 @@ describe('csp-header (directive parsing, not just substring matching)', () => {
         const result = check().evaluate(null, {
             responseHeaders: headersWith({
                 'content-security-policy':
-                    "default-src 'self' 'unsafe-inline'; script-src 'self'",
+                    "default-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
             }),
         })
         expect(result.status).toBe('pass')

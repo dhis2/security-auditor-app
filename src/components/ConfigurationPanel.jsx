@@ -23,17 +23,36 @@ export const ConfigurationPanel = () => {
     const [saving, setSaving] = useState(false)
     const [saveMessage, setSaveMessage] = useState(null)
     const fileInputRef = useRef(null)
+    const messageTimerRef = useRef(null)
 
     // Update local config when global config changes
     useEffect(() => {
         setLocalConfig(config)
     }, [config])
 
-    // Show a transient feedback message; auto-clears after `timeoutMs`.
+    // Show a transient feedback message; auto-clears after `timeoutMs`. Cancels
+    // any pending clear-timer so successive calls don't blank out a newer
+    // message early. The cleanup effect below clears the timer on unmount so
+    // we don't `setState` on an unmounted component.
     const flashMessage = useCallback((message, timeoutMs = 3000) => {
+        if (messageTimerRef.current) {
+            clearTimeout(messageTimerRef.current)
+        }
         setSaveMessage(message)
-        setTimeout(() => setSaveMessage(null), timeoutMs)
+        messageTimerRef.current = setTimeout(() => {
+            setSaveMessage(null)
+            messageTimerRef.current = null
+        }, timeoutMs)
     }, [])
+
+    useEffect(
+        () => () => {
+            if (messageTimerRef.current) {
+                clearTimeout(messageTimerRef.current)
+            }
+        },
+        []
+    )
 
     const handleChange = (key, value) => {
         setLocalConfig((prev) => ({ ...prev, [key]: parseInt(value, 10) }))

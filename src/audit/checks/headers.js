@@ -23,15 +23,15 @@ export const getHeaderChecks = () => [
 
             // Parse directives. The header is a semicolon-separated list:
             //   max-age=31536000; includeSubDomains; preload
+            // The value after `max-age=` must be entirely digits — `parseInt`
+            // alone would silently accept `max-age=31536000abc`.
             const directives = hstsHeader
                 .split(';')
                 .map((d) => d.trim().toLowerCase())
-            const maxAgeDirective = directives.find((d) =>
-                d.startsWith('max-age=')
-            )
-            const maxAge = maxAgeDirective
-                ? parseInt(maxAgeDirective.slice('max-age='.length), 10)
-                : NaN
+            const maxAgeMatch = directives
+                .map((d) => d.match(/^max-age=(\d+)$/))
+                .find(Boolean)
+            const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1], 10) : NaN
             const ONE_YEAR = 31_536_000
             const ONE_DAY = 86_400
 
@@ -39,7 +39,7 @@ export const getHeaderChecks = () => [
                 return {
                     status: 'warning',
                     message: 'HSTS header is present but max-age is missing or invalid',
-                    details: `Strict-Transport-Security: ${hstsHeader}. A valid max-age (in seconds) is required for HSTS to take effect.`,
+                    details: `Strict-Transport-Security: ${hstsHeader}. A valid max-age (in seconds, digits only) is required for HSTS to take effect.`,
                 }
             }
             if (maxAge < ONE_DAY) {
@@ -308,37 +308,87 @@ export const getHeaderChecks = () => [
                 directives[name.toLowerCase()] = sources
             }
 
+            const BROAD_SOURCES = new Set(['*', 'http:', 'https:', 'data:'])
+            const hasBroad = (sources) =>
+                sources && sources.some((s) => BROAD_SOURCES.has(s))
+            const isLockedDown = (sources) =>
+                sources &&
+                sources.length > 0 &&
+                !sources.some((s) => BROAD_SOURCES.has(s)) &&
+                !sources.includes("'unsafe-inline'") &&
+                !sources.includes("'unsafe-eval'")
+
+            // The "fetch directive" governing scripts is script-src if present,
+            // otherwise default-src. If neither exists, no policy applies to scripts.
             const fetchSources =
                 directives['script-src'] || directives['default-src'] || null
-            // A "broad" source effectively neuters the directive.
-            const broadSources = new Set(['*', 'http:', 'https:', 'data:'])
-            const hasBroadSource =
-                fetchSources && fetchSources.some((s) => broadSources.has(s))
-            const hasUnsafeInline =
-                fetchSources && fetchSources.includes("'unsafe-inline'")
-            const hasUnsafeEval =
-                fetchSources && fetchSources.includes("'unsafe-eval'")
 
             const warnings = []
             if (isReportOnly) {
                 warnings.push('CSP is in report-only mode')
             }
+
+            // 1) script-src / default-src
             if (!fetchSources) {
                 warnings.push('no default-src or script-src directive')
+            } else {
+                if (hasBroad(fetchSources)) {
+                    warnings.push(
+                        `script-src/default-src contains a broad source (${fetchSources
+                            .filter((s) => BROAD_SOURCES.has(s))
+                            .join(', ')})`
+                    )
+                }
+                if (fetchSources.includes("'unsafe-inline'")) {
+                    warnings.push(
+                        "'unsafe-inline' allowed in script-src/default-src"
+                    )
+                }
+                if (fetchSources.includes("'unsafe-eval'")) {
+                    warnings.push(
+                        "'unsafe-eval' allowed in script-src/default-src"
+                    )
+                }
             }
-            if (hasBroadSource) {
+
+            // 2) object-src — should be 'none' to neutralize legacy plugin attacks.
+            const objectSrc =
+                directives['object-src'] || directives['default-src'] || null
+            if (!objectSrc) {
+                warnings.push("object-src is unset (recommend object-src 'none')")
+            } else if (
+                !(objectSrc.length === 1 && objectSrc[0] === "'none'") &&
+                !isLockedDown(objectSrc)
+            ) {
+                warnings.push(`object-src is not strictly locked down`)
+            }
+
+            // 3) base-uri — controls <base> hijacking. Should be 'none' or 'self'.
+            const baseUri = directives['base-uri']
+            if (!baseUri) {
                 warnings.push(
-                    `script-src/default-src contains a broad source (${fetchSources
-                        .filter((s) => broadSources.has(s))
-                        .join(', ')})`
+                    "base-uri is unset (recommend base-uri 'none' or 'self')"
                 )
+            } else if (hasBroad(baseUri)) {
+                warnings.push('base-uri contains a broad source')
             }
-            if (hasUnsafeInline) {
-                warnings.push("'unsafe-inline' allowed in script-src/default-src")
+
+            // 4) frame-ancestors — modern replacement for X-Frame-Options.
+            //    Should be 'none' or 'self' to prevent clickjacking.
+            const frameAncestors = directives['frame-ancestors']
+            if (!frameAncestors) {
+                warnings.push(
+                    "frame-ancestors is unset (recommend 'none' or 'self' for clickjacking protection)"
+                )
+            } else if (hasBroad(frameAncestors)) {
+                warnings.push('frame-ancestors contains a broad source')
             }
-            if (hasUnsafeEval) {
-                warnings.push("'unsafe-eval' allowed in script-src/default-src")
-            }
+
+            // 5) strict-dynamic — informational. Indicates a nonce/hash-based
+            //    policy that trusts loaded scripts to load their own deps.
+            //    Don't warn; just surface it in details.
+            const usesStrictDynamic =
+                fetchSources && fetchSources.includes("'strict-dynamic'")
 
             const hasIssues = warnings.length > 0
             return {
@@ -346,7 +396,7 @@ export const getHeaderChecks = () => [
                 message: hasIssues
                     ? `CSP header configured with warnings: ${warnings.join('; ')}`
                     : 'CSP header is properly configured',
-                details: `Content-Security-Policy${isReportOnly ? '-Report-Only' : ''}: ${cspHeader}`,
+                details: `Content-Security-Policy${isReportOnly ? '-Report-Only' : ''}: ${cspHeader}${usesStrictDynamic ? " (uses 'strict-dynamic')" : ''}`,
             }
         },
     },
