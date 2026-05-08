@@ -7,7 +7,10 @@ describe('findScripts', () => {
         expect(findScripts(123)).toEqual([])
     })
 
-    it('extracts relative <script src> entries', () => {
+    it('preserves the script src as written (relative or absolute)', () => {
+        // The caller resolves these via new URL(src, base), so we keep the
+        // raw form. Stripping leading slashes would break root-absolute
+        // srcs used by DHIS2 v42's unified app shell.
         const html = `
             <html><head>
               <script src="assets/main.js"></script>
@@ -17,8 +20,8 @@ describe('findScripts', () => {
         `
         expect(findScripts(html)).toEqual([
             'assets/main.js',
-            'vendor.js',
-            'sub/path.js',
+            './vendor.js',
+            '/sub/path.js',
         ])
     })
 
