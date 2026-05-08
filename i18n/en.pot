@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-08T06:13:04.363Z\n"
-"PO-Revision-Date: 2026-05-08T06:13:04.363Z\n"
+"POT-Creation-Date: 2026-05-08T21:50:28.608Z\n"
+"PO-Revision-Date: 2026-05-08T21:50:28.608Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -419,21 +419,6 @@ msgstr ""
 
 msgid "All user passwords are up to date (within {{days}} days)"
 msgstr "All user passwords are up to date (within {{days}} days)"
-
-msgid "Default Admin Password Check"
-msgstr "Default Admin Password Check"
-
-msgid "Checking if admin account uses default password"
-msgstr "Checking if admin account uses default password"
-
-msgid "No admin user found"
-msgstr "No admin user found"
-
-msgid "Admin account password has not been changed since the account was created"
-msgstr "Admin account password has not been changed since the account was created"
-
-msgid "Admin password has been changed"
-msgstr "Admin password has been changed"
 
 msgid "Default Admin Credentials Active Check"
 msgstr "Default Admin Credentials Active Check"

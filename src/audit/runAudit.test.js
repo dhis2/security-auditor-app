@@ -247,12 +247,12 @@ describe('runAudit', () => {
         expect(corsWhitelistError.override).toBeNull()
     })
 
-    it('runs all 22 checks', async () => {
+    it('runs all 21 checks', async () => {
         const seen = new Set()
         await runAudit(minimalEngine(), TEST_CONFIG, {
             onStart: (check) => seen.add(check.id),
         })
-        expect(seen.size).toBe(22)
+        expect(seen.size).toBe(21)
     })
 
     it('completes even when prefetch fully fails (degrades to "unavailable" findings)', async () => {
