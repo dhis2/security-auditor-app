@@ -77,8 +77,8 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
             const fetchedHeader = await getServerHeader(systemInfo.contextPath)
             const serverHeader =
                 fetchedHeader === null
-                    ? 'Unable to detect'
-                    : fetchedHeader || 'Not disclosed'
+                    ? i18n.t('Unable to detect')
+                    : fetchedHeader || i18n.t('Not disclosed')
             const reportDate = new Date().toLocaleString()
 
             // Create HTML content for the report
@@ -87,7 +87,7 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>DHIS2 Security Audit Report</title>
+    <title>${escapeHtml(i18n.t('DHIS2 Security Audit Report'))}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -175,34 +175,34 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
     </style>
 </head>
 <body>
-    <h1>DHIS2 Security Audit Report</h1>
+    <h1>${escapeHtml(i18n.t('DHIS2 Security Audit Report'))}</h1>
     <div class="header-info">
-        <strong>Report Generated:</strong> ${escapeHtml(reportDate)}<br>
-        <strong>Total Checks:</strong> ${findings.length}<br>
-        <strong>Failed:</strong> ${findings.filter(f => f.status === 'fail').length}<br>
-        <strong>Warnings:</strong> ${findings.filter(f => f.status === 'warning').length}<br>
-        <strong>Passed:</strong> ${findings.filter(f => f.status === 'pass').length}
+        <strong>${escapeHtml(i18n.t('Report Generated:'))}</strong> ${escapeHtml(reportDate)}<br>
+        <strong>${escapeHtml(i18n.t('Total Checks:'))}</strong> ${findings.length}<br>
+        <strong>${escapeHtml(i18n.t('Failed:'))}</strong> ${findings.filter(f => f.status === 'fail').length}<br>
+        <strong>${escapeHtml(i18n.t('Warnings:'))}</strong> ${findings.filter(f => f.status === 'warning').length}<br>
+        <strong>${escapeHtml(i18n.t('Passed:'))}</strong> ${findings.filter(f => f.status === 'pass').length}
     </div>
 
-    <h2>System Information</h2>
+    <h2>${escapeHtml(i18n.t('System Information'))}</h2>
     <div class="system-info">
 ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
     .map(
         (item) => `        <div class="info-item">
             <div class="info-label">${escapeHtml(item.label)}</div>
-            <div class="info-value">${escapeHtml(item.value || 'N/A')}</div>
+            <div class="info-value">${escapeHtml(item.value || i18n.t('N/A'))}</div>
         </div>`
     )
     .join('\n')}
     </div>
 
-    <h2>Security Findings</h2>
+    <h2>${escapeHtml(i18n.t('Security Findings'))}</h2>
     <table>
         <thead>
             <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Result</th>
+                <th>${escapeHtml(i18n.t('Check'))}</th>
+                <th>${escapeHtml(i18n.t('Status'))}</th>
+                <th>${escapeHtml(i18n.t('Result'))}</th>
             </tr>
         </thead>
         <tbody>

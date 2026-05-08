@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-08T05:33:52.013Z\n"
-"PO-Revision-Date: 2026-05-08T05:33:52.013Z\n"
+"POT-Creation-Date: 2026-05-08T05:46:32.799Z\n"
+"PO-Revision-Date: 2026-05-08T05:46:32.799Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -487,6 +487,33 @@ msgstr "Running"
 msgid "Unknown"
 msgstr "Unknown"
 
+msgid "Unable to detect"
+msgstr "Unable to detect"
+
+msgid "Not disclosed"
+msgstr "Not disclosed"
+
+msgid "DHIS2 Security Audit Report"
+msgstr "DHIS2 Security Audit Report"
+
+msgid "System Information"
+msgstr "System Information"
+
+msgid "N/A"
+msgstr "N/A"
+
+msgid "Security Findings"
+msgstr "Security Findings"
+
+msgid "Check"
+msgstr "Check"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Result"
+msgstr "Result"
+
 msgid "Unknown error"
 msgstr "Unknown error"
 
@@ -519,15 +546,6 @@ msgstr "Security audit completed with warnings. Review recommended."
 
 msgid "All security checks passed successfully!"
 msgstr "All security checks passed successfully!"
-
-msgid "Check"
-msgstr "Check"
-
-msgid "Status"
-msgstr "Status"
-
-msgid "Result"
-msgstr "Result"
 
 msgid "Failed to generate report"
 msgstr "Failed to generate report"
@@ -671,23 +689,44 @@ msgstr "Console"
 msgid "Loading..."
 msgstr "Loading..."
 
-msgid "Unable to detect"
-msgstr "Unable to detect"
-
-msgid "Not disclosed"
-msgstr "Not disclosed"
-
 msgid "Failed to load system information"
 msgstr "Failed to load system information"
 
-msgid "N/A"
-msgstr "N/A"
-
-msgid "System Information"
-msgstr "System Information"
-
 msgid "Information about the DHIS2 instance and server environment"
 msgstr "Information about the DHIS2 instance and server environment"
+
+msgid "Failed to create configuration"
+msgstr "Failed to create configuration"
+
+msgid "Failed to load configuration"
+msgstr "Failed to load configuration"
+
+msgid "Minimum password length"
+msgstr "Minimum password length"
+
+msgid "Maximum inactive months"
+msgstr "Maximum inactive months"
+
+msgid "Maximum password age (days)"
+msgstr "Maximum password age (days)"
+
+msgid "Maximum users with privileged authorities"
+msgstr "Maximum users with privileged authorities"
+
+msgid "Maximum audit pages per query"
+msgstr "Maximum audit pages per query"
+
+msgid "Configuration must be an object"
+msgstr "Configuration must be an object"
+
+msgid "{{label}} must be a number"
+msgstr "{{label}} must be a number"
+
+msgid "{{label}} must be a whole number"
+msgstr "{{label}} must be a whole number"
+
+msgid "{{label}} must be between {{min}} and {{max}}"
+msgstr "{{label}} must be between {{min}} and {{max}}"
 
 msgid "Security Auditor Version"
 msgstr "Security Auditor Version"

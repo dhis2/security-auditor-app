@@ -7,6 +7,7 @@ import {
     useMemo,
 } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
+import i18n from '@dhis2/d2-i18n'
 
 // Default configuration values. Exported so the import-config flow can merge
 // older JSON exports (which may pre-date newer keys) with current defaults.
@@ -65,12 +66,14 @@ export const AuditConfigProvider = ({ children }) => {
                         return { success: true }
                     } catch (createErr) {
                         const message =
-                            createErr.message || 'Failed to create configuration'
+                            createErr.message ||
+                            i18n.t('Failed to create configuration')
                         setError(message)
                         return { success: false, error: message }
                     }
                 }
-                const message = err.message || 'Failed to save configuration'
+                const message =
+                    err.message || i18n.t('Failed to save configuration')
                 setError(message)
                 return { success: false, error: message }
             }
@@ -95,7 +98,7 @@ export const AuditConfigProvider = ({ children }) => {
                 setConfig(DEFAULT_CONFIG)
                 return DEFAULT_CONFIG
             }
-            setError(err.message || 'Failed to load configuration')
+            setError(err.message || i18n.t('Failed to load configuration'))
             return DEFAULT_CONFIG
         } finally {
             setLoading(false)
