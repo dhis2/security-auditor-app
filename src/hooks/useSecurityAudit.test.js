@@ -616,81 +616,8 @@ describe('password-age fetch (version-aware filter)', () => {
     })
 })
 
-// =============================================================================
-// default-admin-password (A2 heuristic: empty OR matches `created`)
-// =============================================================================
-
-describe('default-admin-password (heuristic: never-set OR matches created)', () => {
-    const check = () => findCheck('default-admin-password')
-
-    it('passes when there is no admin user', () => {
-        const result = check().evaluate({ adminUser: { users: [] } })
-        expect(result.status).toBe('pass')
-        expect(result.message).toMatch(/No admin user found/)
-    })
-
-    it('FAILS when passwordLastUpdated is empty', () => {
-        const result = check().evaluate({
-            adminUser: {
-                users: [
-                    {
-                        username: 'admin',
-                        created: '2026-01-01T00:00:00.000',
-                        passwordLastUpdated: '',
-                    },
-                ],
-            },
-        })
-        expect(result.status).toBe('fail')
-    })
-
-    it('FAILS when passwordLastUpdated equals `created` (within 60s)', () => {
-        const result = check().evaluate({
-            adminUser: {
-                users: [
-                    {
-                        username: 'admin',
-                        created: '2026-01-01T00:00:00.000',
-                        passwordLastUpdated: '2026-01-01T00:00:30.000',
-                    },
-                ],
-            },
-        })
-        expect(result.status).toBe('fail')
-    })
-
-    it('passes when passwordLastUpdated is clearly later than `created`', () => {
-        const result = check().evaluate({
-            adminUser: {
-                users: [
-                    {
-                        username: 'admin',
-                        created: '2026-01-01T00:00:00.000',
-                        passwordLastUpdated: '2026-03-15T10:00:00.000',
-                    },
-                ],
-            },
-        })
-        expect(result.status).toBe('pass')
-    })
-
-    it('reads passwordLastUpdated from legacy nested userCredentials (pre-v42)', () => {
-        const result = check().evaluate({
-            adminUser: {
-                users: [
-                    {
-                        username: 'admin',
-                        created: '2026-01-01T00:00:00.000',
-                        userCredentials: {
-                            passwordLastUpdated: '2026-03-15T10:00:00.000',
-                        },
-                    },
-                ],
-            },
-        })
-        expect(result.status).toBe('pass')
-    })
-})
+// The legacy heuristic-based default-admin-password check was removed in
+// favor of the active default-admin-credentials-active check below.
 
 describe('default-admin-credentials-active', () => {
     const check = () => findCheck('default-admin-credentials-active')

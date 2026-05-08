@@ -2,10 +2,6 @@ import i18n from '@dhis2/d2-i18n'
 import { checkDefaultAdminCredentials } from '../../utils/instanceInfo'
 import { fetchAllPaged } from '../../utils/pagination'
 import { passwordLastUpdatedField } from '../../utils/version'
-import {
-    getPasswordLastUpdated,
-    timestampsRoughlyEqual,
-} from '../helpers'
 
 export const getUserChecks = (config) => [
     {
@@ -192,57 +188,11 @@ export const getUserChecks = (config) => [
             }
         },
     },
-    {
-        id: 'default-admin-password',
-        title: i18n.t('Default Admin Password Check'),
-        description: i18n.t('Checking if admin account uses default password'),
-        ranking: 10,
-        query: {
-            adminUser: {
-                resource: 'users',
-                params: {
-                    fields: 'id,username,created,passwordLastUpdated,userCredentials[passwordLastUpdated]',
-                    filter: 'username:eq:admin',
-                },
-            },
-        },
-        evaluate: (data) => {
-            const users = data.adminUser?.users || []
-            if (users.length === 0) {
-                return {
-                    status: 'pass',
-                    message: i18n.t('No admin user found'),
-                    details: null,
-                }
-            }
-
-            const adminUser = users[0]
-            const passwordLastUpdated = getPasswordLastUpdated(adminUser)
-            const created = adminUser.created
-
-            // The DHIS2 API populates `passwordLastUpdated` at user creation,
-            // so an empty value alone is not a reliable signal. We additionally
-            // flag the case where it matches `created` (within 60s), which
-            // indicates the password has not been changed since the user was created.
-            const neverSet = !passwordLastUpdated
-            const matchesCreated = timestampsRoughlyEqual(passwordLastUpdated, created)
-            const hasDefaultPassword = neverSet || matchesCreated
-
-            return {
-                status: hasDefaultPassword ? 'fail' : 'pass',
-                message: hasDefaultPassword
-                    ? i18n.t(
-                          'Admin account password has not been changed since the account was created'
-                      )
-                    : i18n.t('Admin password has been changed'),
-                details: hasDefaultPassword
-                    ? i18n.t(
-                          'CRITICAL: The admin account password appears to be unchanged since user creation. If it is still the default ("district"), change it immediately to prevent unauthorized access.'
-                      )
-                    : null,
-            }
-        },
-    },
+    // The legacy heuristic-based `default-admin-password` check (which
+    // compared passwordLastUpdated to created) was removed in favor of the
+    // active `default-admin-credentials-active` check below, which actually
+    // probes admin/district against the server. Removing the old check also
+    // drops its /api/users?filter=username:eq:admin database query.
     {
         id: 'default-admin-credentials-active',
         title: i18n.t('Default Admin Credentials Active Check'),

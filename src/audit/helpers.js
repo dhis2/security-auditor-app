@@ -1,18 +1,5 @@
 import i18n from '@dhis2/d2-i18n'
 
-// Read passwordLastUpdated, falling back to the legacy nested path used pre-v42.
-export const getPasswordLastUpdated = (user) =>
-    user?.passwordLastUpdated ?? user?.userCredentials?.passwordLastUpdated ?? null
-
-// True if two ISO timestamps are within `toleranceMs` of each other.
-export const timestampsRoughlyEqual = (a, b, toleranceMs = 60_000) => {
-    if (!a || !b) {
-        return false
-    }
-    const diff = Math.abs(new Date(a).getTime() - new Date(b).getTime())
-    return Number.isFinite(diff) && diff <= toleranceMs
-}
-
 // Returns the raw value of a response header from the shared prefetch, or
 // null if the prefetch failed entirely (CORS, network, etc.).
 export const getSharedHeader = (ctx, name) =>
