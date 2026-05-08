@@ -692,6 +692,80 @@ describe('default-admin-password (heuristic: never-set OR matches created)', () 
     })
 })
 
+describe('default-admin-credentials-active', () => {
+    const check = () => findCheck('default-admin-credentials-active')
+
+    beforeEach(() => {
+        global.fetch = jest.fn()
+    })
+
+    it('sends a Basic Auth request without the current session cookie', async () => {
+        global.fetch.mockResolvedValue({
+            status: 401,
+            ok: false,
+            json: jest.fn(),
+        })
+
+        await check().fetch(null, {
+            systemInfo: { contextPath: 'https://example.org/dhis' },
+        })
+
+        expect(global.fetch).toHaveBeenCalledWith(
+            'https://example.org/dhis/api/me?fields=username',
+            expect.objectContaining({
+                method: 'GET',
+                credentials: 'omit',
+                cache: 'no-store',
+                headers: expect.objectContaining({
+                    Authorization: `Basic ${btoa('admin:district')}`,
+                    Accept: 'application/json',
+                }),
+            })
+        )
+    })
+
+    it('fails when admin/district authenticates as admin', () => {
+        const result = check().evaluate({
+            authenticated: true,
+            username: 'admin',
+            status: 200,
+        })
+        expect(result.status).toBe('fail')
+        expect(result.message).toMatch(/accepted/)
+    })
+
+    it('passes when the server rejects admin/district', async () => {
+        global.fetch.mockResolvedValue({
+            status: 401,
+            ok: false,
+            json: jest.fn(),
+        })
+
+        const data = await check().fetch(null, {
+            systemInfo: { contextPath: '' },
+        })
+        const result = check().evaluate(data)
+        expect(result.status).toBe('pass')
+        expect(result.message).toMatch(/not accepted/)
+    })
+
+    it('warns when Basic Auth succeeds for an unexpected user', () => {
+        const result = check().evaluate({
+            authenticated: false,
+            username: 'someone-else',
+            status: 200,
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/Unable to verify/)
+    })
+
+    it('maps fetch failures to a warning finding', () => {
+        const result = check().onError(new Error('SSO blocked request'))
+        expect(result.status).toBe('warning')
+        expect(result.details).toMatch(/SSO blocked request/)
+    })
+})
+
 // =============================================================================
 // users-never-logged-in & users-inactive-3-months (server-side filters)
 // =============================================================================

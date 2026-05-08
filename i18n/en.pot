@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-08T06:04:08.195Z\n"
-"PO-Revision-Date: 2026-05-08T06:04:08.195Z\n"
+"POT-Creation-Date: 2026-05-08T06:13:04.363Z\n"
+"PO-Revision-Date: 2026-05-08T06:13:04.363Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -435,6 +435,66 @@ msgstr "Admin account password has not been changed since the account was create
 msgid "Admin password has been changed"
 msgstr "Admin password has been changed"
 
+msgid "Default Admin Credentials Active Check"
+msgstr "Default Admin Credentials Active Check"
+
+msgid "Actively testing whether admin/district is accepted"
+msgstr "Actively testing whether admin/district is accepted"
+
+msgid "Default admin credentials are accepted by the server"
+msgstr "Default admin credentials are accepted by the server"
+
+msgid ""
+"The server accepted admin/district for the admin account. Change the admin "
+"password immediately. This check sends the test request without the current "
+"session cookie."
+msgstr ""
+"The server accepted admin/district for the admin account. Change the admin "
+"password immediately. This check sends the test request without the current "
+"session cookie."
+
+msgid "Default admin credentials are not accepted"
+msgstr "Default admin credentials are not accepted"
+
+msgid ""
+"The active check received HTTP {{status}}, so admin/district was not "
+"accepted."
+msgstr ""
+"The active check received HTTP {{status}}, so admin/district was not "
+"accepted."
+
+msgid "Unable to verify default admin credentials"
+msgstr "Unable to verify default admin credentials"
+
+msgid ""
+"The active check could not determine whether admin/district works because "
+"{{error}}"
+msgstr ""
+"The active check could not determine whether admin/district works because "
+"{{error}}"
+
+msgid ""
+"The active check returned username {{username}} with HTTP {{status}} "
+"instead of confirming the admin account."
+msgstr ""
+"The active check returned username {{username}} with HTTP {{status}} "
+"instead of confirming the admin account."
+
+msgid "unknown"
+msgstr "unknown"
+
+msgid ""
+"The active admin/district check could not be completed. Basic "
+"authentication may be disabled, blocked by SSO/proxy configuration, or "
+"unavailable in this browser. Reported error {{error}}."
+msgstr ""
+"The active admin/district check could not be completed. Basic "
+"authentication may be disabled, blocked by SSO/proxy configuration, or "
+"unavailable in this browser. Reported error {{error}}."
+
+msgid "Unknown error"
+msgstr "Unknown error"
+
 msgid "Unable to check {{label}} header"
 msgstr "Unable to check {{label}} header"
 
@@ -513,9 +573,6 @@ msgstr "Status"
 
 msgid "Result"
 msgstr "Result"
-
-msgid "Unknown error"
-msgstr "Unknown error"
 
 msgid "Ready to audit"
 msgstr "Ready to audit"

@@ -1,4 +1,5 @@
 import i18n from '@dhis2/d2-i18n'
+import { checkDefaultAdminCredentials } from '../../utils/instanceInfo'
 import { fetchAllPaged } from '../../utils/pagination'
 import { passwordLastUpdatedField } from '../../utils/version'
 import {
@@ -241,5 +242,65 @@ export const getUserChecks = (config) => [
                     : null,
             }
         },
+    },
+    {
+        id: 'default-admin-credentials-active',
+        title: i18n.t('Default Admin Credentials Active Check'),
+        description: i18n.t('Actively testing whether admin/district is accepted'),
+        ranking: 11,
+        fetch: async (_engine, ctx) =>
+            checkDefaultAdminCredentials(ctx.systemInfo?.contextPath),
+        evaluate: (data) => {
+            if (data.authenticated === true) {
+                return {
+                    status: 'fail',
+                    message: i18n.t(
+                        'Default admin credentials are accepted by the server'
+                    ),
+                    details: i18n.t(
+                        'The server accepted admin/district for the admin account. Change the admin password immediately. This check sends the test request without the current session cookie.'
+                    ),
+                }
+            }
+
+            if (
+                data.authenticated === false &&
+                (data.status === 401 || data.status === 403)
+            ) {
+                return {
+                    status: 'pass',
+                    message: i18n.t('Default admin credentials are not accepted'),
+                    details: i18n.t(
+                        'The active check received HTTP {{status}}, so admin/district was not accepted.',
+                        { status: data.status }
+                    ),
+                }
+            }
+
+            return {
+                status: 'warning',
+                message: i18n.t('Unable to verify default admin credentials'),
+                details: data.error
+                    ? i18n.t(
+                          'The active check could not determine whether admin/district works because {{error}}',
+                          { error: data.error }
+                      )
+                    : i18n.t(
+                          'The active check returned username {{username}} with HTTP {{status}} instead of confirming the admin account.',
+                          {
+                              username: data.username || i18n.t('unknown'),
+                              status: data.status || i18n.t('unknown'),
+                          }
+                      ),
+            }
+        },
+        onError: (error) => ({
+            status: 'warning',
+            message: i18n.t('Unable to verify default admin credentials'),
+            details: i18n.t(
+                'The active admin/district check could not be completed. Basic authentication may be disabled, blocked by SSO/proxy configuration, or unavailable in this browser. Reported error {{error}}.',
+                { error: error.message || i18n.t('Unknown error') }
+            ),
+        }),
     },
 ]
