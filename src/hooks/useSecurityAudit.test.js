@@ -409,6 +409,21 @@ describe('csp-header (directive parsing, not just substring matching)', () => {
         expect(result.message).toMatch(/frame-ancestors contains a broad source/)
     })
 
+    it('does not HTML-escape quotes in interpolated warning lists', () => {
+        // Regression: i18next default escapes interpolated values, which
+        // produced visible "&#39;" artifacts when warnings contained quotes
+        // like 'unsafe-inline'. The fix disables the escape globally; this
+        // test asserts the message renders quotes literally.
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.message).toContain("'unsafe-inline'")
+        expect(result.message).not.toContain('&#39;')
+    })
+
     it('lowercases source values so case-mangled keywords are still flagged', () => {
         const result = check().evaluate(null, {
             responseHeaders: headersWith({
