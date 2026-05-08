@@ -7,8 +7,9 @@ import React, {
 } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
 
-// Default configuration values
-const DEFAULT_CONFIG = {
+// Default configuration values. Exported so the import-config flow can merge
+// older JSON exports (which may pre-date newer keys) with current defaults.
+export const DEFAULT_CONFIG = {
     minPasswordLength: 8,
     maxInactiveMonths: 3,
     maxPasswordAgeDays: 365,

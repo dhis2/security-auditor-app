@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-08T05:04:16.207Z\n"
-"PO-Revision-Date: 2026-05-08T05:04:16.207Z\n"
+"POT-Creation-Date: 2026-05-08T05:07:05.184Z\n"
+"PO-Revision-Date: 2026-05-08T05:07:05.184Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -236,6 +236,12 @@ msgstr "Configuration exported successfully"
 
 msgid "Failed to export configuration"
 msgstr "Failed to export configuration"
+
+msgid "Imported file is not a valid configuration object"
+msgstr "Imported file is not a valid configuration object"
+
+msgid "No recognized configuration fields found"
+msgstr "No recognized configuration fields found"
 
 msgid "Configuration imported successfully"
 msgstr "Configuration imported successfully"

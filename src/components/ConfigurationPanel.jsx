@@ -8,7 +8,7 @@ import {
     CircularLoader,
 } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
-import { useAuditConfig } from '../hooks/useAuditConfig'
+import { DEFAULT_CONFIG, useAuditConfig } from '../hooks/useAuditConfig'
 import {
     REQUIRED_CONFIG_KEYS,
     validateConfig,
@@ -100,24 +100,38 @@ export const ConfigurationPanel = () => {
             const text = await file.text()
             const importedConfig = JSON.parse(text)
 
-            const missingKeys = REQUIRED_CONFIG_KEYS.filter(
-                (key) => !(key in importedConfig)
-            )
-            if (missingKeys.length > 0) {
+            if (!importedConfig || typeof importedConfig !== 'object') {
                 throw new Error(
-                    `Missing fields: ${missingKeys.join(', ')}`
+                    i18n.t('Imported file is not a valid configuration object')
                 )
             }
 
-            const errors = validateConfig(importedConfig)
+            // Sanity check: the file should contain at least one recognized key.
+            // Rejects unrelated JSON without rejecting older exports that simply
+            // pre-date a more recent config field (those are upgraded via the
+            // DEFAULT_CONFIG merge below).
+            const hasAnyKnownKey = REQUIRED_CONFIG_KEYS.some(
+                (key) => key in importedConfig
+            )
+            if (!hasAnyKnownKey) {
+                throw new Error(
+                    i18n.t('No recognized configuration fields found')
+                )
+            }
+
+            // Merge with defaults so missing keys (e.g. from an older export)
+            // get filled in automatically.
+            const mergedConfig = { ...DEFAULT_CONFIG, ...importedConfig }
+
+            const errors = validateConfig(mergedConfig)
             if (errors.length > 0) {
                 throw new Error(errors.join('. '))
             }
 
-            const result = await saveConfig(importedConfig)
+            const result = await saveConfig(mergedConfig)
 
             if (result.success) {
-                setLocalConfig(importedConfig)
+                setLocalConfig(mergedConfig)
                 flashMessage({ type: 'success', text: i18n.t('Configuration imported successfully') })
             } else {
                 flashMessage({ type: 'error', text: i18n.t('Failed to save imported configuration') })
