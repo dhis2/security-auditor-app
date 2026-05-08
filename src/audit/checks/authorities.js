@@ -58,7 +58,7 @@ export const getAuthorityChecks = (config) => [
                 authority: 'F_IMPERSONATE_USER',
                 authorityLabel: 'F_IMPERSONATE_USER',
                 contextLabel: 'impersonation access',
-                maxAllowed: 5,
+                maxAllowed: config.maxSuperUserRoles || 5,
             }),
     },
     {
@@ -74,7 +74,7 @@ export const getAuthorityChecks = (config) => [
                 authority: 'F_SYSTEM_SETTING',
                 authorityLabel: 'F_SYSTEM_SETTING',
                 contextLabel: 'system settings access',
-                maxAllowed: 5,
+                maxAllowed: config.maxSuperUserRoles || 5,
             }),
     },
 ]

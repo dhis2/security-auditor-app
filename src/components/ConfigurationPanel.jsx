@@ -205,13 +205,15 @@ export const ConfigurationPanel = () => {
                 />
 
                 <InputField
-                    label={i18n.t('Maximum Super User Roles')}
+                    label={i18n.t('Maximum Privileged Users')}
                     type="number"
                     min="1"
                     max="50"
                     value={String(localConfig.maxSuperUserRoles)}
                     onChange={({ value }) => handleChange('maxSuperUserRoles', value)}
-                    helpText={i18n.t('Maximum number of user roles with ALL authorities before warning')}
+                    helpText={i18n.t(
+                        'Threshold for the number of users holding privileged authorities (ALL, F_PUBLIC_ROUTE_ADD, F_IMPERSONATE_USER, or F_SYSTEM_SETTING) before a warning is raised'
+                    )}
                 />
             </div>
 

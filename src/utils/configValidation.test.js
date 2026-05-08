@@ -32,7 +32,7 @@ describe('validateConfig', () => {
     it('catches values below the minimum', () => {
         const errors = validateConfig({ ...validConfig, maxPasswordAgeDays: 0 })
         expect(errors).toContain(
-            'Maximum password age (days) must be between 1 and 3650'
+            'Maximum password age (days) must be between 30 and 1095'
         )
     })
 
@@ -42,7 +42,7 @@ describe('validateConfig', () => {
             maxSuperUserRoles: 99999,
         })
         expect(errors).toContain(
-            'Maximum super user roles must be between 1 and 1000'
+            'Maximum users with privileged authorities must be between 1 and 50'
         )
     })
 
