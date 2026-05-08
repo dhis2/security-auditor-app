@@ -11,6 +11,11 @@ const RULES = {
         min: 1,
         max: 50,
     },
+    maxAuditPages: {
+        label: 'Maximum audit pages per query',
+        min: 100,
+        max: 50000,
+    },
 }
 
 export const REQUIRED_CONFIG_KEYS = Object.keys(RULES)

@@ -5,6 +5,7 @@ const TEST_CONFIG = {
     maxInactiveMonths: 3,
     maxPasswordAgeDays: 365,
     maxSuperUserRoles: 5,
+    maxAuditPages: 5000,
 }
 
 const findCheck = (id) =>
@@ -642,6 +643,48 @@ describe('default-admin-password (heuristic: never-set OR matches created)', () 
 // =============================================================================
 // users-never-logged-in & users-inactive-3-months (server-side filters)
 // =============================================================================
+
+describe('maxAuditPages threshold flows through to pagination', () => {
+    it('uses config.maxAuditPages as the page-cap when fetching never-logged-in users', async () => {
+        // A "runaway" engine returns pageCount: 9999 forever. With maxPages=3,
+        // fetchAllPaged should throw on the 4th iteration.
+        const runawayEngine = {
+            query: jest.fn(async () => ({
+                __page: {
+                    users: [{ id: 'u' }],
+                    pager: { page: 1, pageCount: 9999, total: 0 },
+                },
+            })),
+        }
+        const tightConfig = { ...TEST_CONFIG, maxAuditPages: 3 }
+        const check = getSecurityChecks(tightConfig).find(
+            (c) => c.id === 'users-never-logged-in'
+        )
+        await expect(check.fetch(runawayEngine)).rejects.toThrow(
+            /exceeded maxPages \(3\)/
+        )
+    })
+
+    it('uses config.maxAuditPages when fetching authority holders', async () => {
+        const runawayEngine = {
+            query: jest.fn(async () => ({
+                __page: {
+                    users: [],
+                    pager: { page: 1, pageCount: 9999, total: 0 },
+                },
+            })),
+        }
+        const tightConfig = { ...TEST_CONFIG, maxAuditPages: 2 }
+        const check = getSecurityChecks(tightConfig).find(
+            (c) => c.id === 'user-roles'
+        )
+        await expect(
+            check.fetch(runawayEngine, {
+                privilegedRoles: [{ id: 'r1', authorities: ['ALL'] }],
+            })
+        ).rejects.toThrow(/exceeded maxPages \(2\)/)
+    })
+})
 
 describe('users-never-logged-in', () => {
     it('issues a paged query filtered by lastLogin:null', async () => {

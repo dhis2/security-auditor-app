@@ -18,7 +18,10 @@ export const getAuthorityChecks = (config) => [
         title: i18n.t('Users With ALL Authority'),
         description: i18n.t('Checking for users with administrative privileges'),
         ranking: 0,
-        fetch: (engine, ctx) => fetchAuthorityHolders(engine, ctx, 'ALL'),
+        fetch: (engine, ctx) =>
+            fetchAuthorityHolders(engine, ctx, 'ALL', {
+                maxPages: config.maxAuditPages,
+            }),
         evaluate: (data, ctx) =>
             summarizeAuthorityHolders({
                 data,
@@ -34,7 +37,10 @@ export const getAuthorityChecks = (config) => [
         title: i18n.t('Users Who Can Add Public Routes'),
         description: i18n.t('Checking for users with route creation privileges'),
         ranking: 0,
-        fetch: (engine, ctx) => fetchAuthorityHolders(engine, ctx, 'F_PUBLIC_ROUTE_ADD'),
+        fetch: (engine, ctx) =>
+            fetchAuthorityHolders(engine, ctx, 'F_PUBLIC_ROUTE_ADD', {
+                maxPages: config.maxAuditPages,
+            }),
         evaluate: (data, ctx) =>
             summarizeAuthorityHolders({
                 data,
@@ -50,7 +56,10 @@ export const getAuthorityChecks = (config) => [
         title: i18n.t('Users Who Can Impersonate Others'),
         description: i18n.t('Checking for users with impersonation privileges'),
         ranking: 0,
-        fetch: (engine, ctx) => fetchAuthorityHolders(engine, ctx, 'F_IMPERSONATE_USER'),
+        fetch: (engine, ctx) =>
+            fetchAuthorityHolders(engine, ctx, 'F_IMPERSONATE_USER', {
+                maxPages: config.maxAuditPages,
+            }),
         evaluate: (data, ctx) =>
             summarizeAuthorityHolders({
                 data,
@@ -66,7 +75,10 @@ export const getAuthorityChecks = (config) => [
         title: i18n.t('Users Who Can Change System Settings'),
         description: i18n.t('Checking for users with system settings modification privileges'),
         ranking: 0,
-        fetch: (engine, ctx) => fetchAuthorityHolders(engine, ctx, 'F_SYSTEM_SETTING'),
+        fetch: (engine, ctx) =>
+            fetchAuthorityHolders(engine, ctx, 'F_SYSTEM_SETTING', {
+                maxPages: config.maxAuditPages,
+            }),
         evaluate: (data, ctx) =>
             summarizeAuthorityHolders({
                 data,

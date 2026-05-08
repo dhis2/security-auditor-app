@@ -13,13 +13,17 @@ export const getUserChecks = (config) => [
         description: i18n.t('Checking for active accounts that have never been used'),
         ranking: 0,
         fetch: async (engine) => {
-            const users = await fetchAllPaged(engine, {
-                resource: 'users',
-                params: {
-                    fields: 'id,username',
-                    filter: ['disabled:eq:false', 'lastLogin:null'],
+            const users = await fetchAllPaged(
+                engine,
+                {
+                    resource: 'users',
+                    params: {
+                        fields: 'id,username',
+                        filter: ['disabled:eq:false', 'lastLogin:null'],
+                    },
                 },
-            })
+                config.maxAuditPages ? { maxPages: config.maxAuditPages } : undefined
+            )
             return { users }
         },
         evaluate: (data) => {
@@ -43,14 +47,18 @@ export const getUserChecks = (config) => [
         ranking: 0,
         fetch: async (engine) => {
             const months = config.maxInactiveMonths || 3
-            const users = await fetchAllPaged(engine, {
-                resource: 'users',
-                params: {
-                    fields: 'id,username,lastLogin',
-                    filter: 'disabled:eq:false',
-                    inactiveMonths: months,
+            const users = await fetchAllPaged(
+                engine,
+                {
+                    resource: 'users',
+                    params: {
+                        fields: 'id,username,lastLogin',
+                        filter: 'disabled:eq:false',
+                        inactiveMonths: months,
+                    },
                 },
-            })
+                config.maxAuditPages ? { maxPages: config.maxAuditPages } : undefined
+            )
             // The inactiveMonths parameter on some DHIS2 versions also matches
             // users with a null lastLogin; exclude them — they're surfaced by
             // the dedicated "users never logged in" check.
@@ -83,24 +91,35 @@ export const getUserChecks = (config) => [
             const thresholdIso = thresholdDate.toISOString().slice(0, 10)
             const pwField = passwordLastUpdatedField(ctx.systemVersion)
 
+            const pageOpts = config.maxAuditPages
+                ? { maxPages: config.maxAuditPages }
+                : undefined
             const [stale, neverSet] = await Promise.all([
-                fetchAllPaged(engine, {
-                    resource: 'users',
-                    params: {
-                        fields: 'id,username',
-                        filter: [
-                            'disabled:eq:false',
-                            `${pwField}:lt:${thresholdIso}`,
-                        ],
+                fetchAllPaged(
+                    engine,
+                    {
+                        resource: 'users',
+                        params: {
+                            fields: 'id,username',
+                            filter: [
+                                'disabled:eq:false',
+                                `${pwField}:lt:${thresholdIso}`,
+                            ],
+                        },
                     },
-                }),
-                fetchAllPaged(engine, {
-                    resource: 'users',
-                    params: {
-                        fields: 'id,username',
-                        filter: ['disabled:eq:false', `${pwField}:null`],
+                    pageOpts
+                ),
+                fetchAllPaged(
+                    engine,
+                    {
+                        resource: 'users',
+                        params: {
+                            fields: 'id,username',
+                            filter: ['disabled:eq:false', `${pwField}:null`],
+                        },
                     },
-                }),
+                    pageOpts
+                ),
             ])
 
             // Server-side `:lt:` excludes nulls, so we union the two result

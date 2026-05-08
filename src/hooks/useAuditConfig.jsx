@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
     maxInactiveMonths: 3,
     maxPasswordAgeDays: 365,
     maxSuperUserRoles: 5,
+    maxAuditPages: 5000,
 }
 
 // DataStore namespace for the app

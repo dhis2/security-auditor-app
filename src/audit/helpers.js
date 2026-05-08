@@ -35,7 +35,12 @@ export const settingsUnavailableFinding = (label) => ({
 // Fetch the users that hold a given authority via any of the prefetched roles.
 // Returns { users } for the evaluator, or { unavailable: true } if the shared
 // role list could not be obtained during prefetch.
-export const fetchAuthorityHolders = async (engine, ctx, authority) => {
+export const fetchAuthorityHolders = async (
+    engine,
+    ctx,
+    authority,
+    { maxPages } = {}
+) => {
     if (!ctx.privilegedRoles) {
         return { unavailable: true, users: [] }
     }
@@ -45,13 +50,17 @@ export const fetchAuthorityHolders = async (engine, ctx, authority) => {
     if (matchingRoleIds.length === 0) {
         return { users: [] }
     }
-    const users = await fetchAllPaged(engine, {
-        resource: 'users',
-        params: {
-            fields: 'id,username,userRoles[id,name]',
-            filter: `userRoles.id:in:[${matchingRoleIds.join(',')}]`,
+    const users = await fetchAllPaged(
+        engine,
+        {
+            resource: 'users',
+            params: {
+                fields: 'id,username,userRoles[id,name]',
+                filter: `userRoles.id:in:[${matchingRoleIds.join(',')}]`,
+            },
         },
-    })
+        maxPages ? { maxPages } : undefined
+    )
     return { users }
 }
 

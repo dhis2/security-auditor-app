@@ -215,6 +215,18 @@ export const ConfigurationPanel = () => {
                         'Threshold for the number of users holding privileged authorities (ALL, F_PUBLIC_ROUTE_ADD, F_IMPERSONATE_USER, or F_SYSTEM_SETTING) before a warning is raised'
                     )}
                 />
+
+                <InputField
+                    label={i18n.t('Maximum Audit Pages Per Query')}
+                    type="number"
+                    min="100"
+                    max="50000"
+                    value={String(localConfig.maxAuditPages)}
+                    onChange={({ value }) => handleChange('maxAuditPages', value)}
+                    helpText={i18n.t(
+                        'Hard cap on how many pages a single audit query will fetch. With the default page size of 200, 5000 pages allows up to 1,000,000 matched rows. Raise for very large instances; lower as a defensive limit.'
+                    )}
+                />
             </div>
 
             <ButtonStrip className={classes.actions}>

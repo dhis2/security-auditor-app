@@ -5,6 +5,7 @@ const validConfig = {
     maxInactiveMonths: 3,
     maxPasswordAgeDays: 365,
     maxSuperUserRoles: 5,
+    maxAuditPages: 5000,
 }
 
 describe('validateConfig', () => {
@@ -52,18 +53,40 @@ describe('validateConfig', () => {
             maxInactiveMonths: 'three',
             maxPasswordAgeDays: 365,
             maxSuperUserRoles: 5,
+            maxAuditPages: 5000,
         })
         expect(errors).toHaveLength(2)
     })
 })
 
 describe('REQUIRED_CONFIG_KEYS', () => {
-    it('lists exactly the four expected keys', () => {
+    it('lists exactly the five expected keys', () => {
         expect(REQUIRED_CONFIG_KEYS).toEqual([
             'minPasswordLength',
             'maxInactiveMonths',
             'maxPasswordAgeDays',
             'maxSuperUserRoles',
+            'maxAuditPages',
         ])
+    })
+})
+
+describe('maxAuditPages', () => {
+    it('rejects values below the minimum', () => {
+        const errors = validateConfig({ ...validConfig, maxAuditPages: 50 })
+        expect(errors).toContain(
+            'Maximum audit pages per query must be between 100 and 50000'
+        )
+    })
+
+    it('rejects values above the maximum', () => {
+        const errors = validateConfig({ ...validConfig, maxAuditPages: 100000 })
+        expect(errors).toContain(
+            'Maximum audit pages per query must be between 100 and 50000'
+        )
+    })
+
+    it('accepts values inside the bounds', () => {
+        expect(validateConfig({ ...validConfig, maxAuditPages: 5000 })).toEqual([])
     })
 })
