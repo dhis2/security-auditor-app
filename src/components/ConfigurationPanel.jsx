@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
     Card,
     Button,
@@ -25,9 +25,15 @@ export const ConfigurationPanel = () => {
     const fileInputRef = useRef(null)
 
     // Update local config when global config changes
-    React.useEffect(() => {
+    useEffect(() => {
         setLocalConfig(config)
     }, [config])
+
+    // Show a transient feedback message; auto-clears after `timeoutMs`.
+    const flashMessage = useCallback((message, timeoutMs = 3000) => {
+        setSaveMessage(message)
+        setTimeout(() => setSaveMessage(null), timeoutMs)
+    }, [])
 
     const handleChange = (key, value) => {
         setLocalConfig((prev) => ({ ...prev, [key]: parseInt(value, 10) }))
@@ -37,8 +43,7 @@ export const ConfigurationPanel = () => {
     const handleSave = async () => {
         const errors = validateConfig(localConfig)
         if (errors.length > 0) {
-            setSaveMessage({ type: 'error', text: errors.join('. ') })
-            setTimeout(() => setSaveMessage(null), 5000)
+            flashMessage({ type: 'error', text: errors.join('. ') }, 5000)
             return
         }
 
@@ -47,16 +52,12 @@ export const ConfigurationPanel = () => {
 
         const result = await saveConfig(localConfig)
 
-        if (result.success) {
-            setSaveMessage({ type: 'success', text: i18n.t('Configuration saved successfully') })
-        } else {
-            setSaveMessage({ type: 'error', text: i18n.t('Failed to save configuration') })
-        }
-
+        flashMessage(
+            result.success
+                ? { type: 'success', text: i18n.t('Configuration saved successfully') }
+                : { type: 'error', text: i18n.t('Failed to save configuration') }
+        )
         setSaving(false)
-
-        // Clear message after 3 seconds
-        setTimeout(() => setSaveMessage(null), 3000)
     }
 
     const handleReset = async () => {
@@ -65,16 +66,12 @@ export const ConfigurationPanel = () => {
 
         const result = await resetConfig()
 
-        if (result.success) {
-            setSaveMessage({ type: 'success', text: i18n.t('Configuration reset to defaults') })
-        } else {
-            setSaveMessage({ type: 'error', text: i18n.t('Failed to reset configuration') })
-        }
-
+        flashMessage(
+            result.success
+                ? { type: 'success', text: i18n.t('Configuration reset to defaults') }
+                : { type: 'error', text: i18n.t('Failed to reset configuration') }
+        )
         setSaving(false)
-
-        // Clear message after 3 seconds
-        setTimeout(() => setSaveMessage(null), 3000)
     }
 
     const handleExport = () => {
@@ -86,11 +83,9 @@ export const ConfigurationPanel = () => {
                 blob,
                 `security-auditor-config-${new Date().toISOString().split('T')[0]}.json`
             )
-            setSaveMessage({ type: 'success', text: i18n.t('Configuration exported successfully') })
-            setTimeout(() => setSaveMessage(null), 3000)
+            flashMessage({ type: 'success', text: i18n.t('Configuration exported successfully') })
         } catch (err) {
-            setSaveMessage({ type: 'error', text: i18n.t('Failed to export configuration') })
-            setTimeout(() => setSaveMessage(null), 3000)
+            flashMessage({ type: 'error', text: i18n.t('Failed to export configuration') })
         }
     }
 
@@ -123,23 +118,20 @@ export const ConfigurationPanel = () => {
 
             if (result.success) {
                 setLocalConfig(importedConfig)
-                setSaveMessage({ type: 'success', text: i18n.t('Configuration imported successfully') })
+                flashMessage({ type: 'success', text: i18n.t('Configuration imported successfully') })
             } else {
-                setSaveMessage({ type: 'error', text: i18n.t('Failed to save imported configuration') })
+                flashMessage({ type: 'error', text: i18n.t('Failed to save imported configuration') })
             }
         } catch (err) {
-            setSaveMessage({
+            flashMessage({
                 type: 'error',
-                text: `${i18n.t('Failed to import configuration')}: ${err.message}`
+                text: `${i18n.t('Failed to import configuration')}: ${err.message}`,
             })
         } finally {
             setSaving(false)
-            // Clear the file input
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
             }
-            // Clear message after 3 seconds
-            setTimeout(() => setSaveMessage(null), 3000)
         }
     }
 

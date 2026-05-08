@@ -135,7 +135,8 @@ const summarizeAuthorityHolders = ({
 }
 
 // Security check definitions (config will be passed in)
-const getSecurityChecks = (config) => [
+// Exported for tests; the production hook keeps it private.
+export const getSecurityChecks = (config) => [
     {
         id: 'user-roles',
         title: i18n.t('Users With ALL Authority'),
@@ -369,13 +370,21 @@ const getSecurityChecks = (config) => [
             if (!ctx.systemSettings) {
                 return settingsUnavailableFinding('minimum password length')
             }
-            const minPasswordLength = parseInt(
-                ctx.systemSettings?.minPasswordLength || 0,
-                10
-            )
+            const raw = ctx.systemSettings.minPasswordLength
+            const minPasswordLength = parseInt(raw, 10)
             const requiredLength = config.minPasswordLength || 8
-            const hasIssue = minPasswordLength < requiredLength
 
+            // Treat malformed/missing values as a warning rather than passing
+            // a default 0 < requiredLength comparison silently.
+            if (!Number.isFinite(minPasswordLength)) {
+                return {
+                    status: 'warning',
+                    message: `Minimum password length is not configured or has a non-numeric value`,
+                    details: `Raw value: ${JSON.stringify(raw)}. Set minPasswordLength to at least ${requiredLength}.`,
+                }
+            }
+
+            const hasIssue = minPasswordLength < requiredLength
             return {
                 status: hasIssue ? 'warning' : 'pass',
                 message: hasIssue
@@ -396,11 +405,20 @@ const getSecurityChecks = (config) => [
             if (!ctx.systemSettings) {
                 return settingsUnavailableFinding('password expiry policy')
             }
-            const credentialsExpires =
-                ctx.systemSettings?.credentialsExpires || '0'
-            const expiryDays = parseInt(credentialsExpires, 10)
-            const hasIssue = expiryDays === 0
+            const raw = ctx.systemSettings.credentialsExpires
+            const expiryDays = parseInt(raw, 10)
 
+            // A non-numeric or missing value is treated as "not configured"
+            // — a warning, not a silent pass.
+            if (!Number.isFinite(expiryDays)) {
+                return {
+                    status: 'warning',
+                    message: 'Password expiry is not configured or has a non-numeric value',
+                    details: `Raw value: ${JSON.stringify(raw)}. Configure credentialsExpires to enable forced password changes.`,
+                }
+            }
+
+            const hasIssue = expiryDays === 0
             return {
                 status: hasIssue ? 'warning' : 'pass',
                 message: hasIssue
@@ -568,18 +586,54 @@ const getSecurityChecks = (config) => [
                 return headerUnavailableFinding('HSTS')
             }
             const hstsHeader = getSharedHeader(ctx, 'strict-transport-security')
-            if (hstsHeader) {
+            if (!hstsHeader) {
                 return {
-                    status: 'pass',
-                    message: 'HSTS header is configured',
-                    details: `Strict-Transport-Security: ${hstsHeader}`,
+                    status: 'warning',
+                    message: 'HSTS header is not present',
+                    details:
+                        'The server is not sending the Strict-Transport-Security header. This header enforces HTTPS connections and prevents protocol downgrade attacks. Consider adding: "Strict-Transport-Security: max-age=31536000; includeSubDomains"',
+                }
+            }
+
+            // Parse directives. The header is a semicolon-separated list:
+            //   max-age=31536000; includeSubDomains; preload
+            const directives = hstsHeader
+                .split(';')
+                .map((d) => d.trim().toLowerCase())
+            const maxAgeDirective = directives.find((d) =>
+                d.startsWith('max-age=')
+            )
+            const maxAge = maxAgeDirective
+                ? parseInt(maxAgeDirective.slice('max-age='.length), 10)
+                : NaN
+            const ONE_YEAR = 31_536_000
+            const ONE_DAY = 86_400
+
+            if (!Number.isFinite(maxAge) || maxAge <= 0) {
+                return {
+                    status: 'warning',
+                    message: 'HSTS header is present but max-age is missing or invalid',
+                    details: `Strict-Transport-Security: ${hstsHeader}. A valid max-age (in seconds) is required for HSTS to take effect.`,
+                }
+            }
+            if (maxAge < ONE_DAY) {
+                return {
+                    status: 'warning',
+                    message: `HSTS max-age is too short (${maxAge}s)`,
+                    details: `Strict-Transport-Security: ${hstsHeader}. A max-age below 1 day provides effectively no protection. Recommended: max-age=31536000 (1 year) with includeSubDomains.`,
+                }
+            }
+            if (maxAge < ONE_YEAR) {
+                return {
+                    status: 'warning',
+                    message: `HSTS max-age is below the recommended 1 year (${maxAge}s)`,
+                    details: `Strict-Transport-Security: ${hstsHeader}. Increase max-age to at least 31536000 (1 year) for stronger protection against downgrade attacks.`,
                 }
             }
             return {
-                status: 'warning',
-                message: 'HSTS header is not present',
-                details:
-                    'The server is not sending the Strict-Transport-Security header. This header enforces HTTPS connections and prevents protocol downgrade attacks. Consider adding: "Strict-Transport-Security: max-age=31536000; includeSubDomains"',
+                status: 'pass',
+                message: `HSTS header is configured with max-age=${maxAge}`,
+                details: `Strict-Transport-Security: ${hstsHeader}`,
             }
         },
     },
@@ -814,30 +868,57 @@ const getSecurityChecks = (config) => [
                         'The server is not sending a Content-Security-Policy header. CSP helps prevent XSS attacks, clickjacking, and other code injection attacks. Consider implementing a CSP policy.',
                 }
             }
-            const hasDefaultSrc = cspHeader.includes('default-src')
-            const hasScriptSrc = cspHeader.includes('script-src')
-            const hasUnsafeInline = cspHeader.includes("'unsafe-inline'")
-            const hasUnsafeEval = cspHeader.includes("'unsafe-eval'")
+
+            // Parse the policy into a directive map so we can inspect the
+            // *values* rather than relying on substring matches that pass
+            // wildly permissive policies like `default-src *`.
+            const directives = {}
+            for (const part of cspHeader.split(';')) {
+                const tokens = part.trim().split(/\s+/).filter(Boolean)
+                if (tokens.length === 0) {
+                    continue
+                }
+                const [name, ...sources] = tokens
+                directives[name.toLowerCase()] = sources
+            }
+
+            const fetchSources =
+                directives['script-src'] || directives['default-src'] || null
+            // A "broad" source effectively neuters the directive.
+            const broadSources = new Set(['*', 'http:', 'https:', 'data:'])
+            const hasBroadSource =
+                fetchSources && fetchSources.some((s) => broadSources.has(s))
+            const hasUnsafeInline =
+                fetchSources && fetchSources.includes("'unsafe-inline'")
+            const hasUnsafeEval =
+                fetchSources && fetchSources.includes("'unsafe-eval'")
 
             const warnings = []
             if (isReportOnly) {
                 warnings.push('CSP is in report-only mode')
             }
+            if (!fetchSources) {
+                warnings.push('no default-src or script-src directive')
+            }
+            if (hasBroadSource) {
+                warnings.push(
+                    `script-src/default-src contains a broad source (${fetchSources
+                        .filter((s) => broadSources.has(s))
+                        .join(', ')})`
+                )
+            }
             if (hasUnsafeInline) {
-                warnings.push("'unsafe-inline' is present")
+                warnings.push("'unsafe-inline' allowed in script-src/default-src")
             }
             if (hasUnsafeEval) {
-                warnings.push("'unsafe-eval' is present")
-            }
-            if (!hasDefaultSrc && !hasScriptSrc) {
-                warnings.push('No default-src or script-src directive')
+                warnings.push("'unsafe-eval' allowed in script-src/default-src")
             }
 
             const hasIssues = warnings.length > 0
             return {
                 status: hasIssues ? 'warning' : 'pass',
                 message: hasIssues
-                    ? `CSP header configured with warnings: ${warnings.join(', ')}`
+                    ? `CSP header configured with warnings: ${warnings.join('; ')}`
                     : 'CSP header is properly configured',
                 details: `Content-Security-Policy${isReportOnly ? '-Report-Only' : ''}: ${cspHeader}`,
             }
