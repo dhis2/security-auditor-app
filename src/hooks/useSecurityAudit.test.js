@@ -226,6 +226,21 @@ describe('password-policy (configurable threshold)', () => {
         })
         expect(result.status).toBe('pass')
     })
+
+    it('warns when minPasswordLength is non-numeric (no false pass)', () => {
+        const check = findCheck('password-policy')
+        const result = check.evaluate(null, {
+            systemSettings: { minPasswordLength: 'abc' },
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/non-numeric|not configured/)
+    })
+
+    it('warns when minPasswordLength is missing (no false pass)', () => {
+        const check = findCheck('password-policy')
+        const result = check.evaluate(null, { systemSettings: {} })
+        expect(result.status).toBe('warning')
+    })
 })
 
 describe('password-expiry-policy', () => {
@@ -245,13 +260,28 @@ describe('password-expiry-policy', () => {
         expect(result.status).toBe('pass')
         expect(result.message).toMatch(/90 days/)
     })
+
+    it('warns when credentialsExpires is non-numeric (no false pass)', () => {
+        const check = findCheck('password-expiry-policy')
+        const result = check.evaluate(null, {
+            systemSettings: { credentialsExpires: 'never' },
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/non-numeric|not configured/)
+    })
+
+    it('warns when credentialsExpires is missing (no false pass)', () => {
+        const check = findCheck('password-expiry-policy')
+        const result = check.evaluate(null, { systemSettings: {} })
+        expect(result.status).toBe('warning')
+    })
 })
 
 // =============================================================================
 // header checks: shared response-headers prefetch (B2)
 // =============================================================================
 
-describe('hsts-header', () => {
+describe('hsts-header (max-age validation)', () => {
     const check = () => findCheck('hsts-header')
 
     it('reports header unavailable when prefetch failed', () => {
@@ -260,21 +290,61 @@ describe('hsts-header', () => {
         expect(result.message).toMatch(/Unable to check HSTS header/)
     })
 
-    it('passes when the header is present', () => {
-        const result = check().evaluate(null, {
-            responseHeaders: headersWith({
-                'strict-transport-security': 'max-age=31536000',
-            }),
-        })
-        expect(result.status).toBe('pass')
-    })
-
     it('warns when the header is absent', () => {
         const result = check().evaluate(null, {
             responseHeaders: headersWith({}),
         })
         expect(result.status).toBe('warning')
         expect(result.message).toMatch(/not present/)
+    })
+
+    it('passes for max-age >= 1 year', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'strict-transport-security':
+                    'max-age=31536000; includeSubDomains',
+            }),
+        })
+        expect(result.status).toBe('pass')
+    })
+
+    it('warns for max-age between 1 day and 1 year (no false pass)', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'strict-transport-security': 'max-age=600000',
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/below the recommended 1 year/)
+    })
+
+    it('warns for max-age below 1 day (no false pass)', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'strict-transport-security': 'max-age=100',
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/too short/)
+    })
+
+    it('warns when max-age is missing entirely (no false pass)', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'strict-transport-security': 'includeSubDomains',
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/missing or invalid/)
+    })
+
+    it('warns when max-age is zero (effectively disabling HSTS)', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'strict-transport-security': 'max-age=0',
+            }),
+        })
+        expect(result.status).toBe('warning')
     })
 })
 
@@ -307,6 +377,96 @@ describe('coop-header', () => {
         })
         expect(result.status).toBe('warning')
         expect(result.message).toMatch(/unexpected value/)
+    })
+})
+
+describe('csp-header (directive parsing, not just substring matching)', () => {
+    const check = () => findCheck('csp-header')
+
+    it('passes for a strict policy', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self'",
+            }),
+        })
+        expect(result.status).toBe('pass')
+    })
+
+    it('warns for default-src * (no false pass)', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy': 'default-src *',
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/broad source/)
+    })
+
+    it('warns when script-src includes a broad source like http:', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self' http:",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/broad source/)
+    })
+
+    it("warns when 'unsafe-inline' is in script-src", () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/unsafe-inline/)
+    })
+
+    it("warns when 'unsafe-eval' is in script-src", () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self' 'unsafe-eval'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/unsafe-eval/)
+    })
+
+    it('warns when neither default-src nor script-src is present', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy': "img-src 'self'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/no default-src or script-src/)
+    })
+
+    it('flags report-only mode separately', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy-report-only':
+                    "default-src 'self'; script-src 'self'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/report-only/)
+    })
+
+    it('prefers the more specific script-src over default-src', () => {
+        // default-src has unsafe-inline but script-src is strict; the policy
+        // is fine for scripts because script-src overrides default-src.
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self' 'unsafe-inline'; script-src 'self'",
+            }),
+        })
+        expect(result.status).toBe('pass')
     })
 })
 
