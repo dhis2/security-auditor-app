@@ -2,9 +2,6 @@ import { useState, useCallback } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
 import { runAudit } from '../audit/runAudit'
 
-// Re-export getSecurityChecks for tests.
-export { getSecurityChecks } from '../audit/checks'
-
 // Sort findings: failures first, then warnings, then errors, then passes.
 // Within a status, higher `ranking` wins.
 const STATUS_ORDER = { fail: 0, warning: 1, error: 2, pass: 3, running: 4 }

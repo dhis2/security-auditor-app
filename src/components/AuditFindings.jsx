@@ -12,20 +12,14 @@ import {
     TableCell,
     Button,
 } from '@dhis2/ui'
-import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
+import { useInstanceInfo } from '../hooks/useInstanceInfo'
 import { APP_VERSION as appVersion } from '../version'
 import { downloadBlob } from '../utils/download'
 import { escapeHtml } from '../utils/html'
 import { getServerHeader } from '../utils/instanceInfo'
 import { getReportSystemInfoItems } from '../utils/systemInfoItems'
 import classes from './AuditFindings.module.css'
-
-const systemInfoQuery = {
-    systemInfo: {
-        resource: 'system/info',
-    },
-}
 
 const StatusBadge = ({ status }) => {
     const getStatusConfig = (status) => {
@@ -72,14 +66,14 @@ const StatusBadge = ({ status }) => {
 export const AuditFindings = ({ findings, auditStatus, progress }) => {
     const [generating, setGenerating] = useState(false)
     const [exportError, setExportError] = useState(null)
-    const { data: systemInfoData } = useDataQuery(systemInfoQuery)
+    const { systemInfo: sharedSystemInfo } = useInstanceInfo()
 
     const generatePDFReport = async () => {
         setGenerating(true)
         setExportError(null)
 
         try {
-            const systemInfo = systemInfoData?.systemInfo || {}
+            const systemInfo = sharedSystemInfo || {}
             const fetchedHeader = await getServerHeader(systemInfo.contextPath)
             const serverHeader =
                 fetchedHeader === null
@@ -214,15 +208,22 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
         <tbody>
 `
 
+            const STATUS_CLASSES = {
+                pass: 'status-pass',
+                warning: 'status-warning',
+                fail: 'status-fail',
+                error: 'status-error',
+            }
             findings.forEach((finding) => {
-                const statusClass = `status-${finding.status}`
+                const statusClass = STATUS_CLASSES[finding.status] || 'status-error'
+                const statusLabel = (finding.status || 'unknown').toUpperCase()
                 htmlContent += `
             <tr>
                 <td>
                     <strong>${escapeHtml(finding.title)}</strong><br>
                     <span style="font-size: 0.9em; color: #666;">${escapeHtml(finding.description)}</span>
                 </td>
-                <td class="${statusClass}">${escapeHtml(finding.status.toUpperCase())}</td>
+                <td class="${statusClass}">${escapeHtml(statusLabel)}</td>
                 <td>
                     ${escapeHtml(finding.message || '')}
                     ${finding.details ? `<div class="details">${escapeHtml(finding.details)}</div>` : ''}

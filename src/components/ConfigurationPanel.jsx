@@ -67,10 +67,7 @@ export const ConfigurationPanel = () => {
         }
 
         setSaving(true)
-        setSaveMessage(null)
-
         const result = await saveConfig(localConfig)
-
         flashMessage(
             result.success
                 ? { type: 'success', text: i18n.t('Configuration saved successfully') }
@@ -81,10 +78,7 @@ export const ConfigurationPanel = () => {
 
     const handleReset = async () => {
         setSaving(true)
-        setSaveMessage(null)
-
         const result = await resetConfig()
-
         flashMessage(
             result.success
                 ? { type: 'success', text: i18n.t('Configuration reset to defaults') }
@@ -113,7 +107,6 @@ export const ConfigurationPanel = () => {
         if (!file) return
 
         setSaving(true)
-        setSaveMessage(null)
 
         try {
             const text = await file.text()

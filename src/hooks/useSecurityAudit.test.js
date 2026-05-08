@@ -1,4 +1,4 @@
-import { getSecurityChecks } from './useSecurityAudit'
+import { getSecurityChecks } from '../audit/checks'
 
 const TEST_CONFIG = {
     minPasswordLength: 8,
@@ -446,6 +446,17 @@ describe('csp-header (directive parsing, not just substring matching)', () => {
         })
         expect(result.status).toBe('warning')
         expect(result.message).toMatch(/frame-ancestors contains a broad source/)
+    })
+
+    it('lowercases source values so case-mangled keywords are still flagged', () => {
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self' 'UNSAFE-INLINE'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/unsafe-inline/)
     })
 
     it("notes 'strict-dynamic' in details when present", () => {

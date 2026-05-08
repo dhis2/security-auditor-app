@@ -4,6 +4,7 @@ import React, {
     useState,
     useEffect,
     useCallback,
+    useMemo,
 } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
 
@@ -111,14 +112,20 @@ export const AuditConfigProvider = ({ children }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const value = {
-        config,
-        loading,
-        error,
-        saveConfig,
-        resetConfig,
-        reloadConfig: loadConfig,
-    }
+    // Memoized so consumers like useSecurityAudit can safely include the
+    // returned value in dependency arrays without recreating callbacks on
+    // every provider render.
+    const value = useMemo(
+        () => ({
+            config,
+            loading,
+            error,
+            saveConfig,
+            resetConfig,
+            reloadConfig: loadConfig,
+        }),
+        [config, loading, error, saveConfig, resetConfig, loadConfig]
+    )
 
     return (
         <AuditConfigContext.Provider value={value}>

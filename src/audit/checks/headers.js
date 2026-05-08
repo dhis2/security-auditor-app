@@ -297,7 +297,10 @@ export const getHeaderChecks = () => [
 
             // Parse the policy into a directive map so we can inspect the
             // *values* rather than relying on substring matches that pass
-            // wildly permissive policies like `default-src *`.
+            // wildly permissive policies like `default-src *`. Both directive
+            // names AND source values are lowercased — keyword sources like
+            // 'unsafe-inline' are case-insensitive in practice and a policy
+            // like default-src 'UNSAFE-INLINE' should not slip past.
             const directives = {}
             for (const part of cspHeader.split(';')) {
                 const tokens = part.trim().split(/\s+/).filter(Boolean)
@@ -305,18 +308,12 @@ export const getHeaderChecks = () => [
                     continue
                 }
                 const [name, ...sources] = tokens
-                directives[name.toLowerCase()] = sources
+                directives[name.toLowerCase()] = sources.map((s) => s.toLowerCase())
             }
 
             const BROAD_SOURCES = new Set(['*', 'http:', 'https:', 'data:'])
             const hasBroad = (sources) =>
                 sources && sources.some((s) => BROAD_SOURCES.has(s))
-            const isLockedDown = (sources) =>
-                sources &&
-                sources.length > 0 &&
-                !sources.some((s) => BROAD_SOURCES.has(s)) &&
-                !sources.includes("'unsafe-inline'") &&
-                !sources.includes("'unsafe-eval'")
 
             // The "fetch directive" governing scripts is script-src if present,
             // otherwise default-src. If neither exists, no policy applies to scripts.
@@ -354,13 +351,18 @@ export const getHeaderChecks = () => [
             // 2) object-src — should be 'none' to neutralize legacy plugin attacks.
             const objectSrc =
                 directives['object-src'] || directives['default-src'] || null
+            const objectSrcIsNone =
+                objectSrc && objectSrc.length === 1 && objectSrc[0] === "'none'"
+            const objectSrcIsLockedDown =
+                objectSrc &&
+                objectSrc.length > 0 &&
+                !hasBroad(objectSrc) &&
+                !objectSrc.includes("'unsafe-inline'") &&
+                !objectSrc.includes("'unsafe-eval'")
             if (!objectSrc) {
                 warnings.push("object-src is unset (recommend object-src 'none')")
-            } else if (
-                !(objectSrc.length === 1 && objectSrc[0] === "'none'") &&
-                !isLockedDown(objectSrc)
-            ) {
-                warnings.push(`object-src is not strictly locked down`)
+            } else if (!objectSrcIsNone && !objectSrcIsLockedDown) {
+                warnings.push('object-src is not strictly locked down')
             }
 
             // 3) base-uri — controls <base> hijacking. Should be 'none' or 'self'.
