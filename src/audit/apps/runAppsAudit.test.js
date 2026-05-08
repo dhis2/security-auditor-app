@@ -11,7 +11,7 @@ const makeFetchText = (filesByUrl) => async (url) => {
     if (!(url in filesByUrl)) {
         throw new Error(`HTTP 404 (no fixture for ${url})`)
     }
-    return filesByUrl[url]
+    return { text: filesByUrl[url], finalUrl: url }
 }
 
 const cleanAnalyze = () => ({ warnings: [], isMinified: false })
@@ -59,7 +59,7 @@ describe('runAppsAudit', () => {
             await new Promise((r) => setTimeout(r, 5))
             active -= 1
             // Tiny index with no scripts so we only count the index.html fetch.
-            return '<html></html>'
+            return { text: '<html></html>', finalUrl: url }
         }
         const engine = makeEngine(
             Array.from({ length: 8 }, (_, i) => ({
@@ -107,7 +107,7 @@ describe('runAppsAudit', () => {
             if (url === 'https://server/dhis/api/apps/broken/index.html') {
                 throw new Error('Network down')
             }
-            return '<html></html>'
+            return { text: '<html></html>', finalUrl: url }
         }
         const results = await runAppsAudit(engine, TEST_CONFIG, {}, {
             analyze: cleanAnalyze,
@@ -151,6 +151,44 @@ describe('runAppsAudit', () => {
         ])
     })
 
+    it('resolves /absolute script srcs against the origin (not the app path)', async () => {
+        // Regression: DHIS2 v42's unified app shell serves the same shell
+        // HTML for every dhis-web-* path, with <script src="/assets/main-X.js">
+        // (root-absolute). The scanner used to strip leading "/" and then
+        // concat onto the app's path, producing a 404. The fix uses
+        // new URL(src, base) which preserves the absolute path semantics.
+        const engine = makeEngine([
+            {
+                key: 'core-app',
+                name: 'Core App',
+                baseUrl: 'https://server/dhis-web-core-app',
+            },
+        ])
+        const requested = []
+        const fetchText = async (url) => {
+            requested.push(url)
+            if (url === 'https://server/dhis-web-core-app/index.html') {
+                return {
+                    text: '<script src="/assets/main-DH0lLmwl.js"></script>',
+                    finalUrl: url,
+                }
+            }
+            if (url === 'https://server/assets/main-DH0lLmwl.js') {
+                return { text: 'console.log(1)', finalUrl: url }
+            }
+            throw new Error(`HTTP 404 for ${url}`)
+        }
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            fetchText,
+        })
+        // Confirm the script was fetched from the origin root, NOT from
+        // /dhis-web-core-app/assets/...
+        expect(requested).toContain('https://server/assets/main-DH0lLmwl.js')
+        expect(result.status).toBe('pass')
+        expect(result.files[0].error).toBeUndefined()
+    })
+
     it('builds absolute paths via contextPath when app.baseUrl is missing', async () => {
         // Regression: previously the fallback used a relative URL
         // ("api/apps/<key>") which the browser resolved against the
@@ -164,7 +202,7 @@ describe('runAppsAudit', () => {
         const requested = []
         const fetchText = async (url) => {
             requested.push(url)
-            return '<html></html>'
+            return { text: '<html></html>', finalUrl: url }
         }
         await runAppsAudit(engine, TEST_CONFIG, {}, {
             analyze: cleanAnalyze,

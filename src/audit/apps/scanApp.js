@@ -16,36 +16,41 @@ const deriveContextPath = () => {
     return match ? match[1] : ''
 }
 
-// Build an absolute path (or absolute URL) for a file inside an installed
-// app. Preference order:
-//   1. app.baseUrl from /api/apps (newer DHIS2 versions return an absolute URL)
+// Build a URL to fetch the app's index.html. Preference:
+//   1. app.baseUrl (newer DHIS2 returns absolute URL)
 //   2. <contextPath>/api/apps/<key>
-// We never use a relative URL — relative resolution against the running app's
-// own document URL would point inside this app, not the target app.
-const buildAppFileUrl = (app, file, contextPath) => {
+const buildIndexUrl = (app, contextPath) => {
     if (app.baseUrl) {
-        return `${app.baseUrl.replace(/\/+$/, '')}/${file}`
+        return `${app.baseUrl.replace(/\/+$/, '')}/index.html`
     }
     const cp = (contextPath ?? deriveContextPath()).replace(/\/+$/, '')
-    return `${cp}/api/apps/${app.key}/${file}`
+    return `${cp}/api/apps/${app.key}/index.html`
 }
 
 // Scan a single installed app: list its scripts, fetch each, run the analyzer.
-// `analyze` is the js-x-ray runASTAnalysis function (injected so tests don't
-// need the real package). `fetchText(url)` returns the response body as a
-// string; defaults to the global fetch.
-// `contextPath` is the DHIS2 instance's context path (from system/info),
-// passed through so URL construction works on instances mounted at /dhis
-// or any other subpath. If not supplied, it's derived from window.location.
+//
+// Script srcs in the index.html are resolved against the index.html's final
+// URL (post-redirect), using the standard URL constructor. This correctly
+// handles:
+//   - Relative srcs ("main.js", "./main.js", "assets/main.js") resolved
+//     against the directory of the index.html
+//   - Root-absolute srcs ("/assets/main.js") which are common in DHIS2 v42's
+//     unified app shell — the bundle lives at the origin root, not at the
+//     per-app path
+//   - Server redirects (response.url differs from the requested URL)
+//
+// `analyze`, `fetchText`, and `contextPath` are test-injection seams.
 export const scanApp = async ({
     app,
     analyze,
     fetchText = defaultFetchText,
     contextPath,
 }) => {
-    let indexHtml
+    const indexRequestUrl = buildIndexUrl(app, contextPath)
+
+    let indexResponse
     try {
-        indexHtml = await fetchText(buildAppFileUrl(app, 'index.html', contextPath))
+        indexResponse = await fetchText(indexRequestUrl)
     } catch (err) {
         return {
             app,
@@ -54,7 +59,8 @@ export const scanApp = async ({
         }
     }
 
-    const scripts = findScripts(indexHtml)
+    const indexBaseUrl = indexResponse.finalUrl || indexRequestUrl
+    const scripts = findScripts(indexResponse.text)
     if (scripts.length === 0) {
         return {
             app,
@@ -65,18 +71,31 @@ export const scanApp = async ({
 
     const files = []
     for (const src of scripts) {
-        files.push(await scanFile(app, src, analyze, fetchText, contextPath))
+        const absoluteUrl = resolveUrl(src, indexBaseUrl)
+        files.push(await scanFile(src, absoluteUrl, analyze, fetchText))
     }
     return { app, files }
 }
 
-const scanFile = async (app, src, analyze, fetchText, contextPath) => {
-    let source
+// Resolve a script src against the served-index URL. URL constructor handles
+// both root-absolute and relative inputs. Falls back to a plain join if the
+// constructor throws (extremely unlikely with a well-formed base).
+const resolveUrl = (src, base) => {
     try {
-        source = await fetchText(buildAppFileUrl(app, src, contextPath))
+        return new URL(src, base).href
+    } catch {
+        return src
+    }
+}
+
+const scanFile = async (src, absoluteUrl, analyze, fetchText) => {
+    let response
+    try {
+        response = await fetchText(absoluteUrl)
     } catch (err) {
         return { src, error: `Fetch failed: ${err.message}` }
     }
+    const source = response.text
     if (source.length > MAX_FILE_BYTES) {
         return {
             src,
@@ -97,10 +116,13 @@ const scanFile = async (app, src, analyze, fetchText, contextPath) => {
     }
 }
 
+// Fetch helper that returns both the body and the final URL (post-redirect).
+// The final URL is needed to resolve script src attributes that may be
+// relative to the served document, not the originally-requested URL.
 const defaultFetchText = async (url) => {
     const response = await fetch(url, { credentials: 'include' })
     if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
     }
-    return response.text()
+    return { text: await response.text(), finalUrl: response.url || url }
 }
