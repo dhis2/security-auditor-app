@@ -253,6 +253,20 @@ export const ConfigurationPanel = () => {
                         'Hard cap on how many pages a single audit query will fetch. With the default page size of 200, 5000 pages allows up to 1,000,000 matched rows. Raise for very large instances; lower as a defensive limit.'
                     )}
                 />
+
+                <InputField
+                    label={i18n.t('Apps Audit Concurrency')}
+                    type="number"
+                    min="1"
+                    max="16"
+                    value={String(localConfig.maxAppAuditConcurrency)}
+                    onChange={({ value }) =>
+                        handleChange('maxAppAuditConcurrency', value)
+                    }
+                    helpText={i18n.t(
+                        'Number of installed apps scanned in parallel by the Apps Audit. Higher values fetch faster but use more CPU during obfuscation analysis.'
+                    )}
+                />
             </div>
 
             <ButtonStrip className={classes.actions}>
