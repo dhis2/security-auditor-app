@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-08T22:57:32.630Z\n"
-"PO-Revision-Date: 2026-05-08T22:57:32.630Z\n"
+"POT-Creation-Date: 2026-05-08T23:00:28.784Z\n"
+"PO-Revision-Date: 2026-05-08T23:00:28.784Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -517,6 +517,15 @@ msgstr ""
 msgid "No users with {{authority}} authority found."
 msgstr "No users with {{authority}} authority found."
 
+msgid "App Hub"
+msgstr "App Hub"
+
+msgid "Manual"
+msgstr "Manual"
+
+msgid "Unknown"
+msgstr "Unknown"
+
 msgid "Pass"
 msgstr "Pass"
 
@@ -528,9 +537,6 @@ msgstr "Fail"
 
 msgid "Info"
 msgstr "Info"
-
-msgid "Unknown"
-msgstr "Unknown"
 
 msgid "{{current}} of {{total}} apps scanned"
 msgstr "{{current}} of {{total}} apps scanned"
@@ -589,6 +595,9 @@ msgstr "App"
 
 msgid "Version"
 msgstr "Version"
+
+msgid "Source"
+msgstr "Source"
 
 msgid "Status"
 msgstr "Status"
