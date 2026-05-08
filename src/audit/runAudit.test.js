@@ -96,6 +96,83 @@ describe('buildAuditContext', () => {
         const ctx = await buildAuditContext(engine)
         expect(ctx.responseHeaders.get('server')).toBe('nginx/1.20')
     })
+
+    it('partitions privileged users by authority via a single shared fetch', async () => {
+        const engine = makeRoutedEngine({
+            'system/info': () => ({ version: '2.42.0', contextPath: '' }),
+            userRoles: () => ({
+                userRoles: [
+                    { id: 'r1', name: 'Super', authorities: ['ALL'] },
+                    {
+                        id: 'r2',
+                        name: 'Routes',
+                        authorities: ['F_PUBLIC_ROUTE_ADD'],
+                    },
+                ],
+            }),
+            systemSettings: () => ({}),
+            users: () => ({
+                users: [
+                    { id: 'u1', userRoles: [{ id: 'r1', name: 'Super' }] },
+                    { id: 'u2', userRoles: [{ id: 'r2', name: 'Routes' }] },
+                ],
+                pager: { page: 1, pageCount: 1, total: 2 },
+            }),
+        })
+        const ctx = await buildAuditContext(engine, TEST_CONFIG)
+        expect(ctx.privilegedUsersByAuthority.ALL.map((u) => u.id)).toEqual([
+            'u1',
+        ])
+        expect(
+            ctx.privilegedUsersByAuthority.F_PUBLIC_ROUTE_ADD.map((u) => u.id)
+        ).toEqual(['u2'])
+        // Exactly one users-fetch (in addition to the 3 prefetch queries).
+        const userQueries = engine.query.mock.calls.filter((c) =>
+            Object.values(c[0])[0].resource === 'users' ||
+            Object.values(c[0])[0].resource?.startsWith('users')
+        )
+        expect(userQueries.length).toBe(1)
+    })
+
+    it('honors config.maxAuditPages on the authority users fetch', async () => {
+        const engine = {
+            query: jest.fn(async (q) => {
+                const resource = Object.values(q)[0].resource
+                if (resource === 'system/info') {
+                    return { systemInfo: { version: '2.42.0', contextPath: '' } }
+                }
+                if (resource === 'userRoles') {
+                    return {
+                        userRoles: {
+                            userRoles: [
+                                { id: 'r1', name: 'Super', authorities: ['ALL'] },
+                            ],
+                        },
+                    }
+                }
+                if (resource === 'systemSettings') {
+                    return { settings: {} }
+                }
+                if (resource === 'users') {
+                    // Runaway pager
+                    return {
+                        __page: {
+                            users: [],
+                            pager: { page: 1, pageCount: 9999, total: 0 },
+                        },
+                    }
+                }
+                throw new Error(`unexpected ${resource}`)
+            }),
+        }
+        const ctx = await buildAuditContext(engine, {
+            ...TEST_CONFIG,
+            maxAuditPages: 3,
+        })
+        // With a runaway pager and maxAuditPages=3, fetchAllPaged throws.
+        // buildAuditContext catches the error → privilegedUsersByAuthority is null.
+        expect(ctx.privilegedUsersByAuthority).toBeNull()
+    })
 })
 
 // =============================================================================

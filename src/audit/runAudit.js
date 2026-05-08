@@ -1,4 +1,5 @@
 import { fetchApiMeHeaders } from '../utils/instanceInfo'
+import { fetchAllPaged } from '../utils/pagination'
 import { parseDhis2Version } from '../utils/version'
 import {
     getSecurityChecks,
@@ -9,11 +10,12 @@ import {
 // Pre-fetch shared data so dependent checks can reuse it. Each resource is
 // captured independently so a failure in one doesn't cascade to unrelated
 // checks. Returns a fully populated `ctx` (some fields may be null on failure).
-export const buildAuditContext = async (engine) => {
+export const buildAuditContext = async (engine, config = {}) => {
     const ctx = {
         systemVersion: null,
         systemInfo: null,
         privilegedRoles: null,
+        privilegedUsersByAuthority: null,
         systemSettings: null,
         responseHeaders: null,
     }
@@ -59,6 +61,44 @@ export const buildAuditContext = async (engine) => {
         ctx.responseHeaders = await fetchApiMeHeaders(ctx.systemInfo?.contextPath)
     } catch {
         // Network or CORS failure — checks fall back to the "unavailable" finding.
+    }
+
+    // Single users-fetch covering ALL privileged role IDs, then partitioned
+    // by authority in JS. Replaces 4 separate per-authority queries.
+    if (ctx.privilegedRoles && ctx.privilegedRoles.length > 0) {
+        const allRoleIds = ctx.privilegedRoles.map((r) => r.id)
+        try {
+            const users = await fetchAllPaged(
+                engine,
+                {
+                    resource: 'users',
+                    params: {
+                        fields: 'id,username,userRoles[id,name]',
+                        filter: `userRoles.id:in:[${allRoleIds.join(',')}]`,
+                    },
+                },
+                config.maxAuditPages ? { maxPages: config.maxAuditPages } : undefined
+            )
+            const byAuthority = {}
+            for (const authority of PRIVILEGED_AUTHORITIES) {
+                const matchingRoleIds = new Set(
+                    ctx.privilegedRoles
+                        .filter((r) => (r.authorities || []).includes(authority))
+                        .map((r) => r.id)
+                )
+                byAuthority[authority] = users.filter((u) =>
+                    (u.userRoles || []).some((r) => matchingRoleIds.has(r.id))
+                )
+            }
+            ctx.privilegedUsersByAuthority = byAuthority
+        } catch {
+            // Authority checks fall back to "unavailable".
+        }
+    } else if (ctx.privilegedRoles) {
+        // No privileged roles defined → empty buckets.
+        ctx.privilegedUsersByAuthority = Object.fromEntries(
+            PRIVILEGED_AUTHORITIES.map((a) => [a, []])
+        )
     }
 
     return ctx
@@ -109,17 +149,26 @@ const runOneCheck = async (check, engine, ctx, callbacks) => {
 // Run the full audit. `callbacks` lets a caller (e.g. the React hook) observe
 // the progression: prefetch completion, per-check start/data/result/error, and
 // overall completion. All callbacks are optional.
+//
+// Checks run in parallel after the shared prefetch completes. Most checks just
+// read from ctx so the parallelism is essentially free; the few that issue
+// their own fetches (the user-bucket checks) overlap their network roundtrips.
 export const runAudit = async (engine, config, callbacks = {}) => {
     const checks = getSecurityChecks(config)
-    callbacks.onStartRun?.({ total: checks.length })
+    const total = checks.length
+    callbacks.onStartRun?.({ total })
 
-    const ctx = await buildAuditContext(engine)
+    const ctx = await buildAuditContext(engine, config)
     callbacks.onContext?.(ctx)
 
-    for (let i = 0; i < checks.length; i++) {
-        await runOneCheck(checks[i], engine, ctx, callbacks)
-        callbacks.onProgress?.({ current: i + 1, total: checks.length })
-    }
+    let completed = 0
+    await Promise.all(
+        checks.map(async (check) => {
+            await runOneCheck(check, engine, ctx, callbacks)
+            completed += 1
+            callbacks.onProgress?.({ current: completed, total })
+        })
+    )
 
     callbacks.onComplete?.()
 }

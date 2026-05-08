@@ -1,5 +1,4 @@
 import i18n from '@dhis2/d2-i18n'
-import { fetchAllPaged } from '../utils/pagination'
 
 // Read passwordLastUpdated, falling back to the legacy nested path used pre-v42.
 export const getPasswordLastUpdated = (user) =>
@@ -37,48 +36,16 @@ export const settingsUnavailableFinding = (label) => ({
     ),
 })
 
-// Fetch the users that hold a given authority via any of the prefetched roles.
-// Returns { users } for the evaluator, or { unavailable: true } if the shared
-// role list could not be obtained during prefetch.
-export const fetchAuthorityHolders = async (
-    engine,
-    ctx,
-    authority,
-    { maxPages } = {}
-) => {
-    if (!ctx.privilegedRoles) {
-        return { unavailable: true, users: [] }
-    }
-    const matchingRoleIds = ctx.privilegedRoles
-        .filter((role) => (role.authorities || []).includes(authority))
-        .map((role) => role.id)
-    if (matchingRoleIds.length === 0) {
-        return { users: [] }
-    }
-    const users = await fetchAllPaged(
-        engine,
-        {
-            resource: 'users',
-            params: {
-                fields: 'id,username,userRoles[id,name]',
-                filter: `userRoles.id:in:[${matchingRoleIds.join(',')}]`,
-            },
-        },
-        maxPages ? { maxPages } : undefined
-    )
-    return { users }
-}
-
-// Build the shared finding for an authority check.
+// Build the shared finding for an authority check. Reads from the prefetched
+// users-by-authority map populated in buildAuditContext.
 export const summarizeAuthorityHolders = ({
-    data,
     ctx,
     authority,
     authorityLabel,
     contextLabel,
     maxAllowed,
 }) => {
-    if (data.unavailable) {
+    if (!ctx.privilegedUsersByAuthority) {
         return {
             status: 'warning',
             message: i18n.t(
@@ -96,8 +63,9 @@ export const summarizeAuthorityHolders = ({
             .filter((role) => (role.authorities || []).includes(authority))
             .map((role) => role.id)
     )
+    const users = ctx.privilegedUsersByAuthority[authority] || []
     const usersWithAuthority = new Map()
-    for (const user of data.users) {
+    for (const user of users) {
         const matchedRoles = (user.userRoles || []).filter((role) =>
             matchingRoleIds.has(role.id)
         )
