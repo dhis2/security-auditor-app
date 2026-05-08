@@ -409,6 +409,21 @@ describe('csp-header (directive parsing, not just substring matching)', () => {
         expect(result.message).toMatch(/frame-ancestors contains a broad source/)
     })
 
+    it('does not HTML-escape quotes in interpolated warning lists', () => {
+        // Regression: i18next default escapes interpolated values, which
+        // produced visible "&#39;" artifacts when warnings contained quotes
+        // like 'unsafe-inline'. The fix disables the escape globally; this
+        // test asserts the message renders quotes literally.
+        const result = check().evaluate(null, {
+            responseHeaders: headersWith({
+                'content-security-policy':
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+            }),
+        })
+        expect(result.message).toContain("'unsafe-inline'")
+        expect(result.message).not.toContain('&#39;')
+    })
+
     it('lowercases source values so case-mangled keywords are still flagged', () => {
         const result = check().evaluate(null, {
             responseHeaders: headersWith({
@@ -674,6 +689,80 @@ describe('default-admin-password (heuristic: never-set OR matches created)', () 
             },
         })
         expect(result.status).toBe('pass')
+    })
+})
+
+describe('default-admin-credentials-active', () => {
+    const check = () => findCheck('default-admin-credentials-active')
+
+    beforeEach(() => {
+        global.fetch = jest.fn()
+    })
+
+    it('sends a Basic Auth request without the current session cookie', async () => {
+        global.fetch.mockResolvedValue({
+            status: 401,
+            ok: false,
+            json: jest.fn(),
+        })
+
+        await check().fetch(null, {
+            systemInfo: { contextPath: 'https://example.org/dhis' },
+        })
+
+        expect(global.fetch).toHaveBeenCalledWith(
+            'https://example.org/dhis/api/me?fields=username',
+            expect.objectContaining({
+                method: 'GET',
+                credentials: 'omit',
+                cache: 'no-store',
+                headers: expect.objectContaining({
+                    Authorization: `Basic ${btoa('admin:district')}`,
+                    Accept: 'application/json',
+                }),
+            })
+        )
+    })
+
+    it('fails when admin/district authenticates as admin', () => {
+        const result = check().evaluate({
+            authenticated: true,
+            username: 'admin',
+            status: 200,
+        })
+        expect(result.status).toBe('fail')
+        expect(result.message).toMatch(/accepted/)
+    })
+
+    it('passes when the server rejects admin/district', async () => {
+        global.fetch.mockResolvedValue({
+            status: 401,
+            ok: false,
+            json: jest.fn(),
+        })
+
+        const data = await check().fetch(null, {
+            systemInfo: { contextPath: '' },
+        })
+        const result = check().evaluate(data)
+        expect(result.status).toBe('pass')
+        expect(result.message).toMatch(/not accepted/)
+    })
+
+    it('warns when Basic Auth succeeds for an unexpected user', () => {
+        const result = check().evaluate({
+            authenticated: false,
+            username: 'someone-else',
+            status: 200,
+        })
+        expect(result.status).toBe('warning')
+        expect(result.message).toMatch(/Unable to verify/)
+    })
+
+    it('maps fetch failures to a warning finding', () => {
+        const result = check().onError(new Error('SSO blocked request'))
+        expect(result.status).toBe('warning')
+        expect(result.details).toMatch(/SSO blocked request/)
     })
 })
 

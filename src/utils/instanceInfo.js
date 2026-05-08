@@ -13,6 +13,16 @@ const headerPromisesByUrl = new Map()
 const buildApiMeUrl = (contextPath) =>
     contextPath ? `${contextPath}/api/me` : '../api/me'
 
+const buildApiMeFieldsUrl = (contextPath) =>
+    `${buildApiMeUrl(contextPath)}?fields=username`
+
+const basicAuth = (username, password) => {
+    if (typeof btoa !== 'function') {
+        throw new Error('Basic authentication check is not supported in this browser')
+    }
+    return `Basic ${btoa(`${username}:${password}`)}`
+}
+
 export const fetchApiMeHeaders = (contextPath) => {
     const url = buildApiMeUrl(contextPath)
     const cached = headerPromisesByUrl.get(url)
@@ -37,6 +47,50 @@ export const getServerHeader = async (contextPath) => {
         return headers.get('server')
     } catch {
         return null
+    }
+}
+
+// Actively test whether the public default DHIS2 admin credentials still work.
+// This deliberately omits the current session cookie so it does not replace or
+// disturb the logged-in user's browser session.
+export const checkDefaultAdminCredentials = async (contextPath) => {
+    const response = await fetch(buildApiMeFieldsUrl(contextPath), {
+        method: 'GET',
+        headers: {
+            Authorization: basicAuth('admin', 'district'),
+            Accept: 'application/json',
+        },
+        credentials: 'omit',
+        cache: 'no-store',
+    })
+
+    if (response.status === 401 || response.status === 403) {
+        return { authenticated: false, status: response.status }
+    }
+
+    if (!response.ok) {
+        return {
+            authenticated: null,
+            status: response.status,
+            error: `Unexpected HTTP ${response.status}`,
+        }
+    }
+
+    let data
+    try {
+        data = await response.json()
+    } catch (error) {
+        return {
+            authenticated: null,
+            status: response.status,
+            error: error.message || 'Unable to parse response',
+        }
+    }
+
+    return {
+        authenticated: data?.username === 'admin',
+        username: data?.username || null,
+        status: response.status,
     }
 }
 

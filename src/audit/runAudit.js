@@ -55,47 +55,59 @@ export const buildAuditContext = async (engine, config = {}) => {
         ctx.systemSettings = settingsRes.value.settings || {}
     }
 
-    // Single fetch for response-header checks; the same Promise is shared with
-    // SystemInfo and the report exporter via fetchApiMeHeaders' cache.
-    try {
-        ctx.responseHeaders = await fetchApiMeHeaders(ctx.systemInfo?.contextPath)
-    } catch {
-        // Network or CORS failure — checks fall back to the "unavailable" finding.
+    // Second wave: the response-header fetch and the privileged-users fetch
+    // are independent (different endpoints, no dependency between them) so
+    // they run in parallel. Each is captured separately so a failure in one
+    // doesn't block the other.
+    const headersPromise = fetchApiMeHeaders(
+        ctx.systemInfo?.contextPath
+    ).catch(() => null) // Network/CORS failure → checks see responseHeaders: null.
+
+    const privilegedUsersPromise =
+        ctx.privilegedRoles && ctx.privilegedRoles.length > 0
+            ? fetchAllPaged(
+                  engine,
+                  {
+                      resource: 'users',
+                      params: {
+                          fields: 'id,username,userRoles[id,name]',
+                          filter: `userRoles.id:in:[${ctx.privilegedRoles
+                              .map((r) => r.id)
+                              .join(',')}]`,
+                      },
+                  },
+                  config.maxAuditPages
+                      ? { maxPages: config.maxAuditPages }
+                      : undefined
+              ).catch(() => null) // Authority checks see "unavailable".
+            : Promise.resolve(null)
+
+    const [headersResult, usersResult] = await Promise.all([
+        headersPromise,
+        privilegedUsersPromise,
+    ])
+
+    if (headersResult) {
+        ctx.responseHeaders = headersResult
     }
 
-    // Single users-fetch covering ALL privileged role IDs, then partitioned
-    // by authority in JS. Replaces 4 separate per-authority queries.
-    if (ctx.privilegedRoles && ctx.privilegedRoles.length > 0) {
-        const allRoleIds = ctx.privilegedRoles.map((r) => r.id)
-        try {
-            const users = await fetchAllPaged(
-                engine,
-                {
-                    resource: 'users',
-                    params: {
-                        fields: 'id,username,userRoles[id,name]',
-                        filter: `userRoles.id:in:[${allRoleIds.join(',')}]`,
-                    },
-                },
-                config.maxAuditPages ? { maxPages: config.maxAuditPages } : undefined
+    if (usersResult) {
+        // Partition users by authority: each user belongs to every authority
+        // granted by any of their roles.
+        const byAuthority = {}
+        for (const authority of PRIVILEGED_AUTHORITIES) {
+            const matchingRoleIds = new Set(
+                ctx.privilegedRoles
+                    .filter((r) => (r.authorities || []).includes(authority))
+                    .map((r) => r.id)
             )
-            const byAuthority = {}
-            for (const authority of PRIVILEGED_AUTHORITIES) {
-                const matchingRoleIds = new Set(
-                    ctx.privilegedRoles
-                        .filter((r) => (r.authorities || []).includes(authority))
-                        .map((r) => r.id)
-                )
-                byAuthority[authority] = users.filter((u) =>
-                    (u.userRoles || []).some((r) => matchingRoleIds.has(r.id))
-                )
-            }
-            ctx.privilegedUsersByAuthority = byAuthority
-        } catch {
-            // Authority checks fall back to "unavailable".
+            byAuthority[authority] = usersResult.filter((u) =>
+                (u.userRoles || []).some((r) => matchingRoleIds.has(r.id))
+            )
         }
-    } else if (ctx.privilegedRoles) {
-        // No privileged roles defined → empty buckets.
+        ctx.privilegedUsersByAuthority = byAuthority
+    } else if (ctx.privilegedRoles && ctx.privilegedRoles.length === 0) {
+        // No privileged roles defined → empty buckets (vs. "unavailable").
         ctx.privilegedUsersByAuthority = Object.fromEntries(
             PRIVILEGED_AUTHORITIES.map((a) => [a, []])
         )

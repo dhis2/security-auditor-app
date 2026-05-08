@@ -3,11 +3,13 @@ import { useDataEngine } from '@dhis2/app-runtime'
 import { runAudit } from '../audit/runAudit'
 
 // Sort findings: failures first, then warnings, then errors, then passes.
-// Within a status, higher `ranking` wins.
+// Within a status, higher `ranking` wins. Unknown statuses fall to the end
+// rather than producing NaN comparisons.
 const STATUS_ORDER = { fail: 0, warning: 1, error: 2, pass: 3, running: 4 }
+const orderOf = (status) => STATUS_ORDER[status] ?? 99
 const sortFindings = (findings) =>
     [...findings].sort((a, b) => {
-        const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+        const statusDiff = orderOf(a.status) - orderOf(b.status)
         if (statusDiff !== 0) {
             return statusDiff
         }
