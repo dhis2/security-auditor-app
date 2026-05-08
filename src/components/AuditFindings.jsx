@@ -265,7 +265,7 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
                             </p>
                         </div>
                         {onStartAudit && (
-                            <Button primary large onClick={onStartAudit}>
+                            <Button primary onClick={onStartAudit}>
                                 {i18n.t('Start DHIS2 Audit')}
                             </Button>
                         )}

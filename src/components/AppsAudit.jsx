@@ -184,7 +184,7 @@ export const AppsAudit = ({
                                 )}
                             </p>
                         </div>
-                        <Button primary large onClick={onStart}>
+                        <Button primary onClick={onStart}>
                             {i18n.t('Start Apps Audit')}
                         </Button>
                     </div>
