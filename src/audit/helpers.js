@@ -1,3 +1,4 @@
+import i18n from '@dhis2/d2-i18n'
 import { fetchAllPaged } from '../utils/pagination'
 
 // Read passwordLastUpdated, falling back to the legacy nested path used pre-v42.
@@ -21,15 +22,19 @@ export const getSharedHeader = (ctx, name) =>
 // Build the "could not check this header — shared response unavailable" finding.
 export const headerUnavailableFinding = (label) => ({
     status: 'warning',
-    message: `Unable to check ${label} header`,
-    details: 'The audit could not fetch response headers from this DHIS2 instance. This may be due to CORS restrictions or a network failure.',
+    message: i18n.t('Unable to check {{label}} header', { label }),
+    details: i18n.t(
+        'The audit could not fetch response headers from this DHIS2 instance. This may be due to CORS restrictions or a network failure.'
+    ),
 })
 
 // Used by settings checks when the bulk systemSettings prefetch failed.
 export const settingsUnavailableFinding = (label) => ({
     status: 'warning',
-    message: `Unable to check ${label}`,
-    details: 'The audit could not fetch system settings from this DHIS2 instance. The user may lack permission to read systemSettings, or the server may be unreachable.',
+    message: i18n.t('Unable to check {{label}}', { label }),
+    details: i18n.t(
+        'The audit could not fetch system settings from this DHIS2 instance. The user may lack permission to read systemSettings, or the server may be unreachable.'
+    ),
 })
 
 // Fetch the users that hold a given authority via any of the prefetched roles.
@@ -76,8 +81,13 @@ export const summarizeAuthorityHolders = ({
     if (data.unavailable) {
         return {
             status: 'warning',
-            message: `Could not check ${authorityLabel} authority — privileged role data unavailable`,
-            details: 'The audit could not pre-fetch the list of roles with privileged authorities. The instance may be unreachable, or the user may lack permission to read userRoles.',
+            message: i18n.t(
+                'Could not check {{authority}} authority — privileged role data unavailable',
+                { authority: authorityLabel }
+            ),
+            details: i18n.t(
+                'The audit could not pre-fetch the list of roles with privileged authorities. The instance may be unreachable, or the user may lack permission to read userRoles.'
+            ),
         }
     }
 
@@ -108,16 +118,37 @@ export const summarizeAuthorityHolders = ({
         const usersList = Array.from(usersWithAuthority.values())
             .map((info) => `${info.username} (${info.roles.join(', ')})`)
             .join('; ')
-        details = `Users with ${authorityLabel} authority: ${usersList}`
+        details = i18n.t('Users with {{authority}} authority: {{usersList}}', {
+            authority: authorityLabel,
+            usersList,
+        })
+    }
+
+    let message
+    if (hasIssue) {
+        message = i18n.t(
+            'Found {{total}} users with {{authority}} authority. Consider limiting {{context}} (max: {{max}}).',
+            {
+                total,
+                authority: authorityLabel,
+                context: contextLabel,
+                max: maxAllowed,
+            }
+        )
+    } else if (total > 0) {
+        message = i18n.t(
+            'Users with {{authority}} authority: {{total}} (max: {{max}}).',
+            { authority: authorityLabel, total, max: maxAllowed }
+        )
+    } else {
+        message = i18n.t('No users with {{authority}} authority found.', {
+            authority: authorityLabel,
+        })
     }
 
     return {
         status: hasIssue ? 'warning' : 'pass',
-        message: hasIssue
-            ? `Found ${total} users with ${authorityLabel} authority. Consider limiting ${contextLabel} (max: ${maxAllowed}).`
-            : total > 0
-            ? `Users with ${authorityLabel} authority: ${total} (max: ${maxAllowed}).`
-            : `No users with ${authorityLabel} authority found.`,
+        message,
         details,
     }
 }

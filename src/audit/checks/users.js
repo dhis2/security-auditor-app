@@ -29,13 +29,25 @@ export const getUserChecks = (config) => [
         evaluate: (data) => {
             const users = data.users
             const total = users.length
+            const sample = users.slice(0, 5).map((u) => u.username).join(', ')
+            const more = total > 5 ? total - 5 : 0
             return {
                 status: total > 0 ? 'warning' : 'pass',
                 message: total > 0
-                    ? `Found ${total} active accounts that have never logged in`
-                    : 'All active users have logged in at least once',
+                    ? i18n.t(
+                          'Found {{total}} active accounts that have never logged in',
+                          { total }
+                      )
+                    : i18n.t('All active users have logged in at least once'),
                 details: total > 0
-                    ? `Consider removing unused accounts: ${users.slice(0, 5).map((u) => u.username).join(', ')}${total > 5 ? ` and ${total - 5} more` : ''}`
+                    ? more > 0
+                        ? i18n.t(
+                              'Consider removing unused accounts: {{sample}} and {{more}} more',
+                              { sample, more }
+                          )
+                        : i18n.t('Consider removing unused accounts: {{sample}}', {
+                              sample,
+                          })
                     : null,
             }
         },
@@ -68,13 +80,29 @@ export const getUserChecks = (config) => [
             const maxMonths = config.maxInactiveMonths || 3
             const users = data.users
             const total = users.length
+            const sample = users.slice(0, 5).map((u) => u.username).join(', ')
+            const more = total > 5 ? total - 5 : 0
             return {
                 status: total > 0 ? 'warning' : 'pass',
                 message: total > 0
-                    ? `Found ${total} users who haven't logged in for ${maxMonths}+ months`
-                    : `All users with login history have recent activity (within ${maxMonths} months)`,
+                    ? i18n.t(
+                          "Found {{total}} users who haven't logged in for {{months}}+ months",
+                          { total, months: maxMonths }
+                      )
+                    : i18n.t(
+                          'All users with login history have recent activity (within {{months}} months)',
+                          { months: maxMonths }
+                      ),
                 details: total > 0
-                    ? `Consider disabling inactive accounts: ${users.slice(0, 5).map((u) => u.username).join(', ')}${total > 5 ? ` and ${total - 5} more` : ''}`
+                    ? more > 0
+                        ? i18n.t(
+                              'Consider disabling inactive accounts: {{sample}} and {{more}} more',
+                              { sample, more }
+                          )
+                        : i18n.t(
+                              'Consider disabling inactive accounts: {{sample}}',
+                              { sample }
+                          )
                     : null,
             }
         },
@@ -137,13 +165,28 @@ export const getUserChecks = (config) => [
             const maxAgeDays = config.maxPasswordAgeDays || 365
             const users = data.users
             const total = users.length
+            const sample = users.slice(0, 5).map((u) => u.username).join(', ')
+            const more = total > 5 ? total - 5 : 0
             return {
                 status: total > 0 ? 'warning' : 'pass',
                 message: total > 0
-                    ? `Found ${total} users with passwords older than ${maxAgeDays} days or never changed`
-                    : `All user passwords are up to date (within ${maxAgeDays} days)`,
+                    ? i18n.t(
+                          'Found {{total}} users with passwords older than {{days}} days or never changed',
+                          { total, days: maxAgeDays }
+                      )
+                    : i18n.t(
+                          'All user passwords are up to date (within {{days}} days)',
+                          { days: maxAgeDays }
+                      ),
                 details: total > 0
-                    ? `Users with stale passwords: ${users.slice(0, 5).map((u) => u.username).join(', ')}${total > 5 ? ` and ${total - 5} more` : ''}`
+                    ? more > 0
+                        ? i18n.t(
+                              'Users with stale passwords: {{sample}} and {{more}} more',
+                              { sample, more }
+                          )
+                        : i18n.t('Users with stale passwords: {{sample}}', {
+                              sample,
+                          })
                     : null,
             }
         },
@@ -167,7 +210,7 @@ export const getUserChecks = (config) => [
             if (users.length === 0) {
                 return {
                     status: 'pass',
-                    message: 'No admin user found',
+                    message: i18n.t('No admin user found'),
                     details: null,
                 }
             }
@@ -187,10 +230,14 @@ export const getUserChecks = (config) => [
             return {
                 status: hasDefaultPassword ? 'fail' : 'pass',
                 message: hasDefaultPassword
-                    ? 'Admin account password has not been changed since the account was created'
-                    : 'Admin password has been changed',
+                    ? i18n.t(
+                          'Admin account password has not been changed since the account was created'
+                      )
+                    : i18n.t('Admin password has been changed'),
                 details: hasDefaultPassword
-                    ? 'CRITICAL: The admin account password appears to be unchanged since user creation. If it is still the default ("district"), change it immediately to prevent unauthorized access.'
+                    ? i18n.t(
+                          'CRITICAL: The admin account password appears to be unchanged since user creation. If it is still the default ("district"), change it immediately to prevent unauthorized access.'
+                      )
                     : null,
             }
         },

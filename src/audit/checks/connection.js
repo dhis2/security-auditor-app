@@ -25,10 +25,13 @@ export const getConnectionChecks = () => [
             return {
                 status: hasIssue ? 'fail' : 'pass',
                 message: hasIssue
-                    ? `Connection is using insecure HTTP protocol`
-                    : 'Connection is secured with HTTPS',
+                    ? i18n.t('Connection is using insecure HTTP protocol')
+                    : i18n.t('Connection is secured with HTTPS'),
                 details: hasIssue
-                    ? `Current protocol: ${window.location.protocol}. HTTPS should be used to encrypt data in transit and prevent man-in-the-middle attacks.`
+                    ? i18n.t(
+                          'Current protocol: {{protocol}}. HTTPS should be used to encrypt data in transit and prevent man-in-the-middle attacks.',
+                          { protocol: window.location.protocol }
+                      )
                     : null,
             }
         },
@@ -53,17 +56,25 @@ export const getConnectionChecks = () => [
 
             const hasWildcard = whitelist.some((url) => url.includes('*'))
 
+            let message
+            if (hasWildcard) {
+                message = i18n.t('CORS whitelist contains wildcards - security risk!')
+            } else if (whitelist.length > 0) {
+                message = i18n.t(
+                    'CORS whitelist is configured with {{count}} allowed origins',
+                    { count: whitelist.length }
+                )
+            } else {
+                message = i18n.t('CORS whitelist is empty')
+            }
+
             return {
                 status: hasWildcard
                     ? 'fail'
                     : whitelist.length > 0
                     ? 'warning'
                     : 'pass',
-                message: hasWildcard
-                    ? 'CORS whitelist contains wildcards - security risk!'
-                    : whitelist.length > 0
-                    ? `CORS whitelist is configured with ${whitelist.length} allowed origins`
-                    : 'CORS whitelist is empty',
+                message,
                 details:
                     hasWildcard || whitelist.length > 0
                         ? whitelist.join(', ')

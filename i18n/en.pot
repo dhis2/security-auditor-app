@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-08T05:20:52.281Z\n"
-"PO-Revision-Date: 2026-05-08T05:20:52.281Z\n"
+"POT-Creation-Date: 2026-05-08T05:27:22.053Z\n"
+"PO-Revision-Date: 2026-05-08T05:27:22.053Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -33,11 +33,17 @@ msgstr "Users With ALL Authority"
 msgid "Checking for users with administrative privileges"
 msgstr "Checking for users with administrative privileges"
 
+msgid "super user access"
+msgstr "super user access"
+
 msgid "Users Who Can Add Public Routes"
 msgstr "Users Who Can Add Public Routes"
 
 msgid "Checking for users with route creation privileges"
 msgstr "Checking for users with route creation privileges"
+
+msgid "public route creation access"
+msgstr "public route creation access"
 
 msgid "Users Who Can Impersonate Others"
 msgstr "Users Who Can Impersonate Others"
@@ -45,11 +51,17 @@ msgstr "Users Who Can Impersonate Others"
 msgid "Checking for users with impersonation privileges"
 msgstr "Checking for users with impersonation privileges"
 
+msgid "impersonation access"
+msgstr "impersonation access"
+
 msgid "Users Who Can Change System Settings"
 msgstr "Users Who Can Change System Settings"
 
 msgid "Checking for users with system settings modification privileges"
 msgstr "Checking for users with system settings modification privileges"
+
+msgid "system settings access"
+msgstr "system settings access"
 
 msgid "HTTPS Connection Security"
 msgstr "HTTPS Connection Security"
@@ -57,11 +69,23 @@ msgstr "HTTPS Connection Security"
 msgid "Verifying secure connection to the server"
 msgstr "Verifying secure connection to the server"
 
+msgid "Connection is using insecure HTTP protocol"
+msgstr "Connection is using insecure HTTP protocol"
+
+msgid "Connection is secured with HTTPS"
+msgstr "Connection is secured with HTTPS"
+
 msgid "CORS Whitelist Configuration"
 msgstr "CORS Whitelist Configuration"
 
 msgid "Checking CORS whitelist configuration"
 msgstr "Checking CORS whitelist configuration"
+
+msgid "CORS whitelist contains wildcards - security risk!"
+msgstr "CORS whitelist contains wildcards - security risk!"
+
+msgid "CORS whitelist is empty"
+msgstr "CORS whitelist is empty"
 
 msgid "HTTP Strict Transport Security (HSTS)"
 msgstr "HTTP Strict Transport Security (HSTS)"
@@ -69,11 +93,39 @@ msgstr "HTTP Strict Transport Security (HSTS)"
 msgid "Checking for HSTS header to enforce HTTPS"
 msgstr "Checking for HSTS header to enforce HTTPS"
 
+msgid "HSTS header is not present"
+msgstr "HSTS header is not present"
+
+msgid "HSTS header is present but max-age is missing or invalid"
+msgstr "HSTS header is present but max-age is missing or invalid"
+
+msgid "HSTS max-age is too short ({{seconds}}s)"
+msgstr "HSTS max-age is too short ({{seconds}}s)"
+
+msgid "HSTS max-age is below the recommended 1 year ({{seconds}}s)"
+msgstr "HSTS max-age is below the recommended 1 year ({{seconds}}s)"
+
+msgid "HSTS header is configured with max-age={{seconds}}"
+msgstr "HSTS header is configured with max-age={{seconds}}"
+
 msgid "Server Header Exposure"
 msgstr "Server Header Exposure"
 
 msgid "Checking if server version information is exposed"
 msgstr "Checking if server version information is exposed"
+
+msgid "Server header is not exposed"
+msgstr "Server header is not exposed"
+
+msgid ""
+"The server does not disclose version information in the Server header, "
+"which is a good security practice."
+msgstr ""
+"The server does not disclose version information in the Server header, "
+"which is a good security practice."
+
+msgid "Server header exposes version information"
+msgstr "Server header exposes version information"
 
 msgid "Cross-Origin-Opener-Policy (COOP)"
 msgstr "Cross-Origin-Opener-Policy (COOP)"
@@ -81,11 +133,35 @@ msgstr "Cross-Origin-Opener-Policy (COOP)"
 msgid "Checking for COOP header to isolate browsing context"
 msgstr "Checking for COOP header to isolate browsing context"
 
+msgid "COOP header is not present"
+msgstr "COOP header is not present"
+
+msgid "COOP header is properly configured with same-origin"
+msgstr "COOP header is properly configured with same-origin"
+
+msgid "COOP header is configured with same-origin-allow-popups"
+msgstr "COOP header is configured with same-origin-allow-popups"
+
+msgid "COOP header is set to unsafe-none"
+msgstr "COOP header is set to unsafe-none"
+
 msgid "Cross-Origin-Embedder-Policy (COEP)"
 msgstr "Cross-Origin-Embedder-Policy (COEP)"
 
 msgid "Checking for COEP header to control resource loading"
 msgstr "Checking for COEP header to control resource loading"
+
+msgid "COEP header is not present"
+msgstr "COEP header is not present"
+
+msgid "COEP header is properly configured with require-corp"
+msgstr "COEP header is properly configured with require-corp"
+
+msgid "COEP header is configured with credentialless"
+msgstr "COEP header is configured with credentialless"
+
+msgid "COEP header is set to unsafe-none"
+msgstr "COEP header is set to unsafe-none"
 
 msgid "Cross-Origin-Resource-Policy (CORP)"
 msgstr "Cross-Origin-Resource-Policy (CORP)"
@@ -93,11 +169,45 @@ msgstr "Cross-Origin-Resource-Policy (CORP)"
 msgid "Checking for CORP header to control resource embedding"
 msgstr "Checking for CORP header to control resource embedding"
 
+msgid "CORP header is not present"
+msgstr "CORP header is not present"
+
+msgid "CORP header is configured with same-origin"
+msgstr "CORP header is configured with same-origin"
+
+msgid "CORP header is configured with same-site"
+msgstr "CORP header is configured with same-site"
+
+msgid "CORP header is set to cross-origin"
+msgstr "CORP header is set to cross-origin"
+
 msgid "CORS Headers Configuration"
 msgstr "CORS Headers Configuration"
 
 msgid "Checking Access-Control-Allow-Origin and credentials configuration"
 msgstr "Checking Access-Control-Allow-Origin and credentials configuration"
+
+msgid "Dangerous CORS configuration detected"
+msgstr "Dangerous CORS configuration detected"
+
+msgid "CORS allows all origins"
+msgstr "CORS allows all origins"
+
+msgid "CORS allows credentials from specific origin"
+msgstr "CORS allows credentials from specific origin"
+
+msgid "CORS configured with specific origin"
+msgstr "CORS configured with specific origin"
+
+msgid "No CORS headers present"
+msgstr "No CORS headers present"
+
+msgid ""
+"Access-Control-Allow-Origin header is not set. This is appropriate if "
+"cross-origin requests are not needed."
+msgstr ""
+"Access-Control-Allow-Origin header is not set. This is appropriate if "
+"cross-origin requests are not needed."
 
 msgid "Content Security Policy (CSP)"
 msgstr "Content Security Policy (CSP)"
@@ -105,11 +215,83 @@ msgstr "Content Security Policy (CSP)"
 msgid "Checking for CSP header and violations"
 msgstr "Checking for CSP header and violations"
 
+msgid "CSP header is not present"
+msgstr "CSP header is not present"
+
+msgid ""
+"The server is not sending a Content-Security-Policy header. CSP helps "
+"prevent XSS attacks, clickjacking, and other code injection attacks. "
+"Consider implementing a CSP policy."
+msgstr ""
+"The server is not sending a Content-Security-Policy header. CSP helps "
+"prevent XSS attacks, clickjacking, and other code injection attacks. "
+"Consider implementing a CSP policy."
+
+msgid "CSP is in report-only mode"
+msgstr "CSP is in report-only mode"
+
+msgid "no default-src or script-src directive"
+msgstr "no default-src or script-src directive"
+
+msgid "script-src/default-src contains a broad source ({{sources}})"
+msgstr "script-src/default-src contains a broad source ({{sources}})"
+
+msgid "'unsafe-inline' allowed in script-src/default-src"
+msgstr "'unsafe-inline' allowed in script-src/default-src"
+
+msgid "'unsafe-eval' allowed in script-src/default-src"
+msgstr "'unsafe-eval' allowed in script-src/default-src"
+
+msgid "object-src is unset (recommend object-src 'none')"
+msgstr "object-src is unset (recommend object-src 'none')"
+
+msgid "object-src is not strictly locked down"
+msgstr "object-src is not strictly locked down"
+
+msgid "base-uri is unset (recommend base-uri 'none' or 'self')"
+msgstr "base-uri is unset (recommend base-uri 'none' or 'self')"
+
+msgid "base-uri contains a broad source"
+msgstr "base-uri contains a broad source"
+
+msgid ""
+"frame-ancestors is unset (recommend 'none' or 'self' for clickjacking "
+"protection)"
+msgstr ""
+"frame-ancestors is unset (recommend 'none' or 'self' for clickjacking "
+"protection)"
+
+msgid "frame-ancestors contains a broad source"
+msgstr "frame-ancestors contains a broad source"
+
+msgid "CSP header is properly configured"
+msgstr "CSP header is properly configured"
+
 msgid "Password Policy Configuration"
 msgstr "Password Policy Configuration"
 
 msgid "Verifying minimum password length requirements"
 msgstr "Verifying minimum password length requirements"
+
+msgid "minimum password length"
+msgstr "minimum password length"
+
+msgid "Minimum password length is not configured or has a non-numeric value"
+msgstr "Minimum password length is not configured or has a non-numeric value"
+
+msgid ""
+"Minimum password length is {{actual}} characters - should be at least "
+"{{required}}"
+msgstr ""
+"Minimum password length is {{actual}} characters - should be at least "
+"{{required}}"
+
+msgid ""
+"Weak passwords increase the risk of unauthorized access. Set "
+"minPasswordLength to at least {{required}}."
+msgstr ""
+"Weak passwords increase the risk of unauthorized access. Set "
+"minPasswordLength to at least {{required}}."
 
 msgid "Password Expiry Policy"
 msgstr "Password Expiry Policy"
@@ -117,11 +299,56 @@ msgstr "Password Expiry Policy"
 msgid "Checking if forced password changes are enabled"
 msgstr "Checking if forced password changes are enabled"
 
+msgid "password expiry policy"
+msgstr "password expiry policy"
+
+msgid "Password expiry is not configured or has a non-numeric value"
+msgstr "Password expiry is not configured or has a non-numeric value"
+
+msgid "Password expiry is disabled - users never required to change passwords"
+msgstr "Password expiry is disabled - users never required to change passwords"
+
+msgid "Password expiry is enabled (passwords expire after {{days}} days)"
+msgstr "Password expiry is enabled (passwords expire after {{days}} days)"
+
+msgid ""
+"Consider enabling password expiry to force periodic password changes and "
+"reduce the risk of compromised credentials."
+msgstr ""
+"Consider enabling password expiry to force periodic password changes and "
+"reduce the risk of compromised credentials."
+
 msgid "Email Verification Enforcement"
 msgstr "Email Verification Enforcement"
 
 msgid "Checking if email verification is enforced"
 msgstr "Checking if email verification is enforced"
+
+msgid "email verification"
+msgstr "email verification"
+
+msgid "Email verification setting not available on this DHIS2 version"
+msgstr "Email verification setting not available on this DHIS2 version"
+
+msgid ""
+"The enforceVerifiedEmail setting was introduced in DHIS2 v42. Upgrade to "
+"enable enforcement of verified email addresses."
+msgstr ""
+"The enforceVerifiedEmail setting was introduced in DHIS2 v42. Upgrade to "
+"enable enforcement of verified email addresses."
+
+msgid "Email verification is not enforced"
+msgstr "Email verification is not enforced"
+
+msgid "Email verification is enforced"
+msgstr "Email verification is enforced"
+
+msgid ""
+"Consider enabling email verification to ensure user accounts are associated "
+"with valid email addresses."
+msgstr ""
+"Consider enabling email verification to ensure user accounts are associated "
+"with valid email addresses."
 
 msgid "Account Lockout Policy"
 msgstr "Account Lockout Policy"
@@ -129,11 +356,41 @@ msgstr "Account Lockout Policy"
 msgid "Checking if account lockout after failed login attempts is enabled"
 msgstr "Checking if account lockout after failed login attempts is enabled"
 
+msgid "account lockout policy"
+msgstr "account lockout policy"
+
+msgid "Account lockout setting not available on this DHIS2 version"
+msgstr "Account lockout setting not available on this DHIS2 version"
+
+msgid ""
+"The lockMultipleFailedLogins setting is not exposed via the API on this "
+"DHIS2 version. Upgrade to enable automated lockout after failed login "
+"attempts."
+msgstr ""
+"The lockMultipleFailedLogins setting is not exposed via the API on this "
+"DHIS2 version. Upgrade to enable automated lockout after failed login "
+"attempts."
+
+msgid "Account lockout after failed login attempts is disabled"
+msgstr "Account lockout after failed login attempts is disabled"
+
+msgid "Account lockout after failed login attempts is enabled"
+msgstr "Account lockout after failed login attempts is enabled"
+
+msgid "Consider enabling account lockout to prevent brute force password attacks."
+msgstr "Consider enabling account lockout to prevent brute force password attacks."
+
 msgid "Users Never Logged In"
 msgstr "Users Never Logged In"
 
 msgid "Checking for active accounts that have never been used"
 msgstr "Checking for active accounts that have never been used"
+
+msgid "Found {{total}} active accounts that have never logged in"
+msgstr "Found {{total}} active accounts that have never logged in"
+
+msgid "All active users have logged in at least once"
+msgstr "All active users have logged in at least once"
 
 msgid "Inactive User Accounts"
 msgstr "Inactive User Accounts"
@@ -141,17 +398,79 @@ msgstr "Inactive User Accounts"
 msgid "Checking for accounts with no recent activity"
 msgstr "Checking for accounts with no recent activity"
 
+msgid "Found {{total}} users who haven't logged in for {{months}}+ months"
+msgstr "Found {{total}} users who haven't logged in for {{months}}+ months"
+
+msgid "All users with login history have recent activity (within {{months}} months)"
+msgstr "All users with login history have recent activity (within {{months}} months)"
+
 msgid "Password Age Verification"
 msgstr "Password Age Verification"
 
 msgid "Checking for stale or unchanged passwords"
 msgstr "Checking for stale or unchanged passwords"
 
+msgid ""
+"Found {{total}} users with passwords older than {{days}} days or never "
+"changed"
+msgstr ""
+"Found {{total}} users with passwords older than {{days}} days or never "
+"changed"
+
+msgid "All user passwords are up to date (within {{days}} days)"
+msgstr "All user passwords are up to date (within {{days}} days)"
+
 msgid "Default Admin Password Check"
 msgstr "Default Admin Password Check"
 
 msgid "Checking if admin account uses default password"
 msgstr "Checking if admin account uses default password"
+
+msgid "No admin user found"
+msgstr "No admin user found"
+
+msgid "Admin account password has not been changed since the account was created"
+msgstr "Admin account password has not been changed since the account was created"
+
+msgid "Admin password has been changed"
+msgstr "Admin password has been changed"
+
+msgid "Unable to check {{label}} header"
+msgstr "Unable to check {{label}} header"
+
+msgid ""
+"The audit could not fetch response headers from this DHIS2 instance. This "
+"may be due to CORS restrictions or a network failure."
+msgstr ""
+"The audit could not fetch response headers from this DHIS2 instance. This "
+"may be due to CORS restrictions or a network failure."
+
+msgid "Unable to check {{label}}"
+msgstr "Unable to check {{label}}"
+
+msgid ""
+"The audit could not fetch system settings from this DHIS2 instance. The "
+"user may lack permission to read systemSettings, or the server may be "
+"unreachable."
+msgstr ""
+"The audit could not fetch system settings from this DHIS2 instance. The "
+"user may lack permission to read systemSettings, or the server may be "
+"unreachable."
+
+msgid "Could not check {{authority}} authority — privileged role data unavailable"
+msgstr "Could not check {{authority}} authority — privileged role data unavailable"
+
+msgid ""
+"The audit could not pre-fetch the list of roles with privileged "
+"authorities. The instance may be unreachable, or the user may lack "
+"permission to read userRoles."
+msgstr ""
+"The audit could not pre-fetch the list of roles with privileged "
+"authorities. The instance may be unreachable, or the user may lack "
+"permission to read userRoles."
+
+msgid "No users with {{authority}} authority found."
+msgstr "No users with {{authority}} authority found."
 
 msgid "Pass"
 msgstr "Pass"

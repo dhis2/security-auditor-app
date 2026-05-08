@@ -15,9 +15,10 @@ export const getHeaderChecks = () => [
             if (!hstsHeader) {
                 return {
                     status: 'warning',
-                    message: 'HSTS header is not present',
-                    details:
-                        'The server is not sending the Strict-Transport-Security header. This header enforces HTTPS connections and prevents protocol downgrade attacks. Consider adding: "Strict-Transport-Security: max-age=31536000; includeSubDomains"',
+                    message: i18n.t('HSTS header is not present'),
+                    details: i18n.t(
+                        'The server is not sending the Strict-Transport-Security header. This header enforces HTTPS connections and prevents protocol downgrade attacks. Consider adding: "Strict-Transport-Security: max-age=31536000; includeSubDomains"'
+                    ),
                 }
             }
 
@@ -38,27 +39,45 @@ export const getHeaderChecks = () => [
             if (!Number.isFinite(maxAge) || maxAge <= 0) {
                 return {
                     status: 'warning',
-                    message: 'HSTS header is present but max-age is missing or invalid',
-                    details: `Strict-Transport-Security: ${hstsHeader}. A valid max-age (in seconds, digits only) is required for HSTS to take effect.`,
+                    message: i18n.t(
+                        'HSTS header is present but max-age is missing or invalid'
+                    ),
+                    details: i18n.t(
+                        'Strict-Transport-Security: {{header}}. A valid max-age (in seconds, digits only) is required for HSTS to take effect.',
+                        { header: hstsHeader }
+                    ),
                 }
             }
             if (maxAge < ONE_DAY) {
                 return {
                     status: 'warning',
-                    message: `HSTS max-age is too short (${maxAge}s)`,
-                    details: `Strict-Transport-Security: ${hstsHeader}. A max-age below 1 day provides effectively no protection. Recommended: max-age=31536000 (1 year) with includeSubDomains.`,
+                    message: i18n.t('HSTS max-age is too short ({{seconds}}s)', {
+                        seconds: maxAge,
+                    }),
+                    details: i18n.t(
+                        'Strict-Transport-Security: {{header}}. A max-age below 1 day provides effectively no protection. Recommended: max-age=31536000 (1 year) with includeSubDomains.',
+                        { header: hstsHeader }
+                    ),
                 }
             }
             if (maxAge < ONE_YEAR) {
                 return {
                     status: 'warning',
-                    message: `HSTS max-age is below the recommended 1 year (${maxAge}s)`,
-                    details: `Strict-Transport-Security: ${hstsHeader}. Increase max-age to at least 31536000 (1 year) for stronger protection against downgrade attacks.`,
+                    message: i18n.t(
+                        'HSTS max-age is below the recommended 1 year ({{seconds}}s)',
+                        { seconds: maxAge }
+                    ),
+                    details: i18n.t(
+                        'Strict-Transport-Security: {{header}}. Increase max-age to at least 31536000 (1 year) for stronger protection against downgrade attacks.',
+                        { header: hstsHeader }
+                    ),
                 }
             }
             return {
                 status: 'pass',
-                message: `HSTS header is configured with max-age=${maxAge}`,
+                message: i18n.t('HSTS header is configured with max-age={{seconds}}', {
+                    seconds: maxAge,
+                }),
                 details: `Strict-Transport-Security: ${hstsHeader}`,
             }
         },
@@ -76,14 +95,19 @@ export const getHeaderChecks = () => [
             if (!serverHeader) {
                 return {
                     status: 'pass',
-                    message: 'Server header is not exposed',
-                    details: 'The server does not disclose version information in the Server header, which is a good security practice.',
+                    message: i18n.t('Server header is not exposed'),
+                    details: i18n.t(
+                        'The server does not disclose version information in the Server header, which is a good security practice.'
+                    ),
                 }
             }
             return {
                 status: 'warning',
-                message: 'Server header exposes version information',
-                details: `Server: ${serverHeader}. Exposing server version information can help attackers identify known vulnerabilities. Consider removing or obfuscating the Server header.`,
+                message: i18n.t('Server header exposes version information'),
+                details: i18n.t(
+                    'Server: {{header}}. Exposing server version information can help attackers identify known vulnerabilities. Consider removing or obfuscating the Server header.',
+                    { header: serverHeader }
+                ),
             }
         },
     },
@@ -100,36 +124,56 @@ export const getHeaderChecks = () => [
             if (!coopHeader) {
                 return {
                     status: 'warning',
-                    message: 'COOP header is not present',
-                    details: 'The Cross-Origin-Opener-Policy header is not configured. This header helps protect against cross-origin attacks by isolating the browsing context. Consider adding: "Cross-Origin-Opener-Policy: same-origin".',
+                    message: i18n.t('COOP header is not present'),
+                    details: i18n.t(
+                        'The Cross-Origin-Opener-Policy header is not configured. This header helps protect against cross-origin attacks by isolating the browsing context. Consider adding: "Cross-Origin-Opener-Policy: same-origin".'
+                    ),
                 }
             }
             const normalizedValue = coopHeader.toLowerCase().trim()
             if (normalizedValue === 'same-origin') {
                 return {
                     status: 'pass',
-                    message: 'COOP header is properly configured with same-origin',
-                    details: `Cross-Origin-Opener-Policy: ${coopHeader}. This provides the strongest isolation.`,
+                    message: i18n.t(
+                        'COOP header is properly configured with same-origin'
+                    ),
+                    details: i18n.t(
+                        'Cross-Origin-Opener-Policy: {{header}}. This provides the strongest isolation.',
+                        { header: coopHeader }
+                    ),
                 }
             }
             if (normalizedValue === 'same-origin-allow-popups') {
                 return {
                     status: 'pass',
-                    message: 'COOP header is configured with same-origin-allow-popups',
-                    details: `Cross-Origin-Opener-Policy: ${coopHeader}. This provides good isolation while allowing popups.`,
+                    message: i18n.t(
+                        'COOP header is configured with same-origin-allow-popups'
+                    ),
+                    details: i18n.t(
+                        'Cross-Origin-Opener-Policy: {{header}}. This provides good isolation while allowing popups.',
+                        { header: coopHeader }
+                    ),
                 }
             }
             if (normalizedValue === 'unsafe-none') {
                 return {
                     status: 'warning',
-                    message: 'COOP header is set to unsafe-none',
-                    details: `Cross-Origin-Opener-Policy: ${coopHeader}. Consider using "same-origin" or "same-origin-allow-popups" for better security.`,
+                    message: i18n.t('COOP header is set to unsafe-none'),
+                    details: i18n.t(
+                        'Cross-Origin-Opener-Policy: {{header}}. Consider using "same-origin" or "same-origin-allow-popups" for better security.',
+                        { header: coopHeader }
+                    ),
                 }
             }
             return {
                 status: 'warning',
-                message: `COOP header has unexpected value: ${coopHeader}`,
-                details: 'Valid values are: same-origin, same-origin-allow-popups, or unsafe-none.',
+                message: i18n.t(
+                    'COOP header has unexpected value: {{header}}',
+                    { header: coopHeader }
+                ),
+                details: i18n.t(
+                    'Valid values are: same-origin, same-origin-allow-popups, or unsafe-none.'
+                ),
             }
         },
     },
@@ -146,36 +190,54 @@ export const getHeaderChecks = () => [
             if (!coepHeader) {
                 return {
                     status: 'warning',
-                    message: 'COEP header is not present',
-                    details: 'The Cross-Origin-Embedder-Policy header is not configured. This header, combined with COOP, enables cross-origin isolation and provides access to powerful features. Consider adding: "Cross-Origin-Embedder-Policy: require-corp".',
+                    message: i18n.t('COEP header is not present'),
+                    details: i18n.t(
+                        'The Cross-Origin-Embedder-Policy header is not configured. This header, combined with COOP, enables cross-origin isolation and provides access to powerful features. Consider adding: "Cross-Origin-Embedder-Policy: require-corp".'
+                    ),
                 }
             }
             const normalizedValue = coepHeader.toLowerCase().trim()
             if (normalizedValue === 'require-corp') {
                 return {
                     status: 'pass',
-                    message: 'COEP header is properly configured with require-corp',
-                    details: `Cross-Origin-Embedder-Policy: ${coepHeader}. This ensures all resources are explicitly marked for cross-origin loading.`,
+                    message: i18n.t(
+                        'COEP header is properly configured with require-corp'
+                    ),
+                    details: i18n.t(
+                        'Cross-Origin-Embedder-Policy: {{header}}. This ensures all resources are explicitly marked for cross-origin loading.',
+                        { header: coepHeader }
+                    ),
                 }
             }
             if (normalizedValue === 'credentialless') {
                 return {
                     status: 'pass',
-                    message: 'COEP header is configured with credentialless',
-                    details: `Cross-Origin-Embedder-Policy: ${coepHeader}. This loads cross-origin resources without credentials.`,
+                    message: i18n.t('COEP header is configured with credentialless'),
+                    details: i18n.t(
+                        'Cross-Origin-Embedder-Policy: {{header}}. This loads cross-origin resources without credentials.',
+                        { header: coepHeader }
+                    ),
                 }
             }
             if (normalizedValue === 'unsafe-none') {
                 return {
                     status: 'warning',
-                    message: 'COEP header is set to unsafe-none',
-                    details: `Cross-Origin-Embedder-Policy: ${coepHeader}. Consider using "require-corp" for better security.`,
+                    message: i18n.t('COEP header is set to unsafe-none'),
+                    details: i18n.t(
+                        'Cross-Origin-Embedder-Policy: {{header}}. Consider using "require-corp" for better security.',
+                        { header: coepHeader }
+                    ),
                 }
             }
             return {
                 status: 'warning',
-                message: `COEP header has unexpected value: ${coepHeader}`,
-                details: 'Valid values are: require-corp, credentialless, or unsafe-none.',
+                message: i18n.t(
+                    'COEP header has unexpected value: {{header}}',
+                    { header: coepHeader }
+                ),
+                details: i18n.t(
+                    'Valid values are: require-corp, credentialless, or unsafe-none.'
+                ),
             }
         },
     },
@@ -192,36 +254,52 @@ export const getHeaderChecks = () => [
             if (!corpHeader) {
                 return {
                     status: 'warning',
-                    message: 'CORP header is not present',
-                    details: 'The Cross-Origin-Resource-Policy header is not configured. This header protects resources from being loaded by other origins. Consider adding: "Cross-Origin-Resource-Policy: same-origin".',
+                    message: i18n.t('CORP header is not present'),
+                    details: i18n.t(
+                        'The Cross-Origin-Resource-Policy header is not configured. This header protects resources from being loaded by other origins. Consider adding: "Cross-Origin-Resource-Policy: same-origin".'
+                    ),
                 }
             }
             const normalizedValue = corpHeader.toLowerCase().trim()
             if (normalizedValue === 'same-origin') {
                 return {
                     status: 'pass',
-                    message: 'CORP header is configured with same-origin',
-                    details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can only be loaded from the same origin.`,
+                    message: i18n.t('CORP header is configured with same-origin'),
+                    details: i18n.t(
+                        'Cross-Origin-Resource-Policy: {{header}}. Resources can only be loaded from the same origin.',
+                        { header: corpHeader }
+                    ),
                 }
             }
             if (normalizedValue === 'same-site') {
                 return {
                     status: 'pass',
-                    message: 'CORP header is configured with same-site',
-                    details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can be loaded from the same site.`,
+                    message: i18n.t('CORP header is configured with same-site'),
+                    details: i18n.t(
+                        'Cross-Origin-Resource-Policy: {{header}}. Resources can be loaded from the same site.',
+                        { header: corpHeader }
+                    ),
                 }
             }
             if (normalizedValue === 'cross-origin') {
                 return {
                     status: 'warning',
-                    message: 'CORP header is set to cross-origin',
-                    details: `Cross-Origin-Resource-Policy: ${corpHeader}. Resources can be loaded from any origin. Consider using "same-origin" or "same-site" for better security.`,
+                    message: i18n.t('CORP header is set to cross-origin'),
+                    details: i18n.t(
+                        'Cross-Origin-Resource-Policy: {{header}}. Resources can be loaded from any origin. Consider using "same-origin" or "same-site" for better security.',
+                        { header: corpHeader }
+                    ),
                 }
             }
             return {
                 status: 'warning',
-                message: `CORP header has unexpected value: ${corpHeader}`,
-                details: 'Valid values are: same-origin, same-site, or cross-origin.',
+                message: i18n.t(
+                    'CORP header has unexpected value: {{header}}',
+                    { header: corpHeader }
+                ),
+                details: i18n.t(
+                    'Valid values are: same-origin, same-site, or cross-origin.'
+                ),
             }
         },
     },
@@ -240,35 +318,44 @@ export const getHeaderChecks = () => [
             if (allowOrigin === '*' && allowCredentials === 'true') {
                 return {
                     status: 'fail',
-                    message: 'Dangerous CORS configuration detected',
-                    details: 'Access-Control-Allow-Origin is set to wildcard (*) with Access-Control-Allow-Credentials: true. This is a critical security vulnerability that allows any origin to make authenticated requests. Change Access-Control-Allow-Origin to specific trusted origins.',
+                    message: i18n.t('Dangerous CORS configuration detected'),
+                    details: i18n.t(
+                        'Access-Control-Allow-Origin is set to wildcard (*) with Access-Control-Allow-Credentials: true. This is a critical security vulnerability that allows any origin to make authenticated requests. Change Access-Control-Allow-Origin to specific trusted origins.'
+                    ),
                 }
             }
             if (allowOrigin === '*') {
                 return {
                     status: 'warning',
-                    message: 'CORS allows all origins',
-                    details: 'Access-Control-Allow-Origin: *. This allows any website to make requests to your API. Consider restricting to specific trusted origins unless this is intentional for a public API.',
+                    message: i18n.t('CORS allows all origins'),
+                    details: i18n.t(
+                        'Access-Control-Allow-Origin: *. This allows any website to make requests to your API. Consider restricting to specific trusted origins unless this is intentional for a public API.'
+                    ),
                 }
             }
             if (allowOrigin && allowCredentials === 'true') {
                 return {
                     status: 'warning',
-                    message: 'CORS allows credentials from specific origin',
-                    details: `Access-Control-Allow-Origin: ${allowOrigin}, Access-Control-Allow-Credentials: true. Ensure this origin is trusted as it can make authenticated requests.`,
+                    message: i18n.t('CORS allows credentials from specific origin'),
+                    details: i18n.t(
+                        'Access-Control-Allow-Origin: {{origin}}, Access-Control-Allow-Credentials: true. Ensure this origin is trusted as it can make authenticated requests.',
+                        { origin: allowOrigin }
+                    ),
                 }
             }
             if (allowOrigin) {
                 return {
                     status: 'pass',
-                    message: 'CORS configured with specific origin',
+                    message: i18n.t('CORS configured with specific origin'),
                     details: `Access-Control-Allow-Origin: ${allowOrigin}${allowCredentials ? `, Access-Control-Allow-Credentials: ${allowCredentials}` : ''}`,
                 }
             }
             return {
                 status: 'pass',
-                message: 'No CORS headers present',
-                details: 'Access-Control-Allow-Origin header is not set. This is appropriate if cross-origin requests are not needed.',
+                message: i18n.t('No CORS headers present'),
+                details: i18n.t(
+                    'Access-Control-Allow-Origin header is not set. This is appropriate if cross-origin requests are not needed.'
+                ),
             }
         },
     },
@@ -289,9 +376,10 @@ export const getHeaderChecks = () => [
             if (!cspHeader) {
                 return {
                     status: 'warning',
-                    message: 'CSP header is not present',
-                    details:
-                        'The server is not sending a Content-Security-Policy header. CSP helps prevent XSS attacks, clickjacking, and other code injection attacks. Consider implementing a CSP policy.',
+                    message: i18n.t('CSP header is not present'),
+                    details: i18n.t(
+                        'The server is not sending a Content-Security-Policy header. CSP helps prevent XSS attacks, clickjacking, and other code injection attacks. Consider implementing a CSP policy.'
+                    ),
                 }
             }
 
@@ -322,28 +410,35 @@ export const getHeaderChecks = () => [
 
             const warnings = []
             if (isReportOnly) {
-                warnings.push('CSP is in report-only mode')
+                warnings.push(i18n.t('CSP is in report-only mode'))
             }
 
             // 1) script-src / default-src
             if (!fetchSources) {
-                warnings.push('no default-src or script-src directive')
+                warnings.push(i18n.t('no default-src or script-src directive'))
             } else {
                 if (hasBroad(fetchSources)) {
                     warnings.push(
-                        `script-src/default-src contains a broad source (${fetchSources
-                            .filter((s) => BROAD_SOURCES.has(s))
-                            .join(', ')})`
+                        i18n.t(
+                            'script-src/default-src contains a broad source ({{sources}})',
+                            {
+                                sources: fetchSources
+                                    .filter((s) => BROAD_SOURCES.has(s))
+                                    .join(', '),
+                            }
+                        )
                     )
                 }
                 if (fetchSources.includes("'unsafe-inline'")) {
                     warnings.push(
-                        "'unsafe-inline' allowed in script-src/default-src"
+                        i18n.t(
+                            "'unsafe-inline' allowed in script-src/default-src"
+                        )
                     )
                 }
                 if (fetchSources.includes("'unsafe-eval'")) {
                     warnings.push(
-                        "'unsafe-eval' allowed in script-src/default-src"
+                        i18n.t("'unsafe-eval' allowed in script-src/default-src")
                     )
                 }
             }
@@ -360,19 +455,21 @@ export const getHeaderChecks = () => [
                 !objectSrc.includes("'unsafe-inline'") &&
                 !objectSrc.includes("'unsafe-eval'")
             if (!objectSrc) {
-                warnings.push("object-src is unset (recommend object-src 'none')")
+                warnings.push(
+                    i18n.t("object-src is unset (recommend object-src 'none')")
+                )
             } else if (!objectSrcIsNone && !objectSrcIsLockedDown) {
-                warnings.push('object-src is not strictly locked down')
+                warnings.push(i18n.t('object-src is not strictly locked down'))
             }
 
             // 3) base-uri — controls <base> hijacking. Should be 'none' or 'self'.
             const baseUri = directives['base-uri']
             if (!baseUri) {
                 warnings.push(
-                    "base-uri is unset (recommend base-uri 'none' or 'self')"
+                    i18n.t("base-uri is unset (recommend base-uri 'none' or 'self')")
                 )
             } else if (hasBroad(baseUri)) {
-                warnings.push('base-uri contains a broad source')
+                warnings.push(i18n.t('base-uri contains a broad source'))
             }
 
             // 4) frame-ancestors — modern replacement for X-Frame-Options.
@@ -380,10 +477,12 @@ export const getHeaderChecks = () => [
             const frameAncestors = directives['frame-ancestors']
             if (!frameAncestors) {
                 warnings.push(
-                    "frame-ancestors is unset (recommend 'none' or 'self' for clickjacking protection)"
+                    i18n.t(
+                        "frame-ancestors is unset (recommend 'none' or 'self' for clickjacking protection)"
+                    )
                 )
             } else if (hasBroad(frameAncestors)) {
-                warnings.push('frame-ancestors contains a broad source')
+                warnings.push(i18n.t('frame-ancestors contains a broad source'))
             }
 
             // 5) strict-dynamic — informational. Indicates a nonce/hash-based
@@ -396,8 +495,10 @@ export const getHeaderChecks = () => [
             return {
                 status: hasIssues ? 'warning' : 'pass',
                 message: hasIssues
-                    ? `CSP header configured with warnings: ${warnings.join('; ')}`
-                    : 'CSP header is properly configured',
+                    ? i18n.t('CSP header configured with warnings: {{warnings}}', {
+                          warnings: warnings.join('; '),
+                      })
+                    : i18n.t('CSP header is properly configured'),
                 details: `Content-Security-Policy${isReportOnly ? '-Report-Only' : ''}: ${cspHeader}${usesStrictDynamic ? " (uses 'strict-dynamic')" : ''}`,
             }
         },
