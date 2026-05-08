@@ -1,3 +1,4 @@
+import i18n from '@dhis2/d2-i18n'
 import { findScripts } from './findScripts'
 
 // Hard cap on per-file size — JS-X-Ray on multi-megabyte minified bundles
@@ -55,7 +56,9 @@ export const scanApp = async ({
         return {
             app,
             files: [],
-            error: `Could not fetch index.html: ${err.message}`,
+            error: i18n.t('Could not fetch index.html: {{message}}', {
+                message: err.message,
+            }),
         }
     }
 
@@ -65,7 +68,7 @@ export const scanApp = async ({
         return {
             app,
             files: [],
-            note: 'No <script src> entries found in index.html',
+            note: i18n.t('No <script src> entries found in index.html'),
         }
     }
 
@@ -93,13 +96,16 @@ const scanFile = async (src, absoluteUrl, analyze, fetchText) => {
     try {
         response = await fetchText(absoluteUrl)
     } catch (err) {
-        return { src, error: `Fetch failed: ${err.message}` }
+        return {
+            src,
+            error: i18n.t('Fetch failed: {{message}}', { message: err.message }),
+        }
     }
     const source = response.text
     if (source.length > MAX_FILE_BYTES) {
         return {
             src,
-            skipped: 'file exceeds size limit',
+            skipped: i18n.t('file exceeds size limit'),
             sizeBytes: source.length,
         }
     }
@@ -112,7 +118,12 @@ const scanFile = async (src, absoluteUrl, analyze, fetchText) => {
             sizeBytes: source.length,
         }
     } catch (err) {
-        return { src, error: `Analyzer failed: ${err.message}` }
+        return {
+            src,
+            error: i18n.t('Analyzer failed: {{message}}', {
+                message: err.message,
+            }),
+        }
     }
 }
 

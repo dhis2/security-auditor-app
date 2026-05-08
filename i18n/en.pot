@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-08T23:00:28.784Z\n"
-"PO-Revision-Date: 2026-05-08T23:00:28.784Z\n"
+"POT-Creation-Date: 2026-05-08T23:02:16.383Z\n"
+"PO-Revision-Date: 2026-05-08T23:02:16.383Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -26,6 +26,12 @@ msgid ""
 msgstr ""
 "This tool is available for administrators only. You need the {{authAll}} or "
 "{{authSystemSetting}} authority to access the Security Auditor."
+
+msgid "No <script src> entries found in index.html"
+msgstr "No <script src> entries found in index.html"
+
+msgid "file exceeds size limit"
+msgstr "file exceeds size limit"
 
 msgid "Users With ALL Authority"
 msgstr "Users With ALL Authority"
