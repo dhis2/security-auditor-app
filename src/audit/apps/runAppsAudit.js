@@ -29,7 +29,10 @@ const runWithConcurrency = async (items, concurrency, worker) => {
 //   onProgress({ current, total })
 //   onComplete(results)
 //
-// `options.fetchText` and `options.analyze` are test-injection seams.
+// `options.fetchText`, `options.analyze`, and `options.contextPath` are
+// test-injection seams. `contextPath` is the DHIS2 instance context path
+// used to construct absolute URLs for app files (e.g. "/dhis"). When
+// omitted, scanApp derives it from window.location.
 export const runAppsAudit = async (engine, config = {}, callbacks = {}, options = {}) => {
     const concurrency = Math.max(1, config.maxAppAuditConcurrency || 4)
 
@@ -60,6 +63,7 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
                     app,
                     analyze,
                     fetchText: options.fetchText,
+                    contextPath: options.contextPath,
                 })
                 const enriched = { ...result, status: appStatus(result.files) }
                 callbacks.onAppDone?.(app, enriched)

@@ -254,18 +254,23 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
     if (auditStatus === 'idle') {
         return (
             <div className={classes.container}>
-                <NoticeBox title={i18n.t('Ready to audit')}>
-                    {i18n.t(
-                        'Click Start DHIS2 Audit to begin the security assessment.'
-                    )}
-                </NoticeBox>
-                {onStartAudit && (
-                    <div className={classes.reportButton}>
-                        <Button primary large onClick={onStartAudit}>
-                            {i18n.t('Start DHIS2 Audit')}
-                        </Button>
+                <Card className={classes.card}>
+                    <div className={classes.cardHeaderRow}>
+                        <div className={classes.cardHeaderText}>
+                            <h3>{i18n.t('DHIS2 Audit')}</h3>
+                            <p>
+                                {i18n.t(
+                                    'Run the security audit against this DHIS2 instance. Checks user authorities, system settings, password policy, response headers, and other configuration.'
+                                )}
+                            </p>
+                        </div>
+                        {onStartAudit && (
+                            <Button primary onClick={onStartAudit}>
+                                {i18n.t('Start DHIS2 Audit')}
+                            </Button>
+                        )}
                     </div>
-                )}
+                </Card>
             </div>
         )
     }

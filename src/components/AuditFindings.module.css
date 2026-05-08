@@ -4,6 +4,30 @@
 
 .card {
     margin-top: 16px;
+    padding: 16px;
+}
+
+/* Card-internal header row: title/description on the left, primary action
+ * button flush to the right. Mirrors the same pattern in AppsAudit so the
+ * two audit cards align visually. */
+.cardHeaderRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.cardHeaderText {
+    flex: 1;
+    min-width: 0;
+}
+
+.cardHeaderText h3 {
+    margin: 0 0 8px 0;
+}
+
+.cardHeaderText p {
+    margin: 0;
 }
 
 .statusBadge {
