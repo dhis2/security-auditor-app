@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CircularLoader, NoticeBox } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { useInstanceInfo } from '../hooks/useInstanceInfo'

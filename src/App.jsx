@@ -1,4 +1,3 @@
-import React from 'react'
 import './locales'
 import { useDataQuery } from '@dhis2/app-runtime'
 import { Card, NoticeBox, CircularLoader } from '@dhis2/ui'

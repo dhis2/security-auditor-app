@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext, useMemo } from 'react'
 import { useDataQuery } from '@dhis2/app-runtime'
 
 // Fields needed by the SystemInfo panel and the HTML report exporter.
