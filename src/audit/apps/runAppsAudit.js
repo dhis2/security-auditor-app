@@ -1,10 +1,7 @@
 import { getAnalyzer } from '../../utils/jsXRay'
 import { appStatus } from './classifyFindings'
+import { fetchInstalledApps } from './fetchInstalledApps'
 import { scanApp } from './scanApp'
-
-const APPS_QUERY = {
-    apps: { resource: 'apps' },
-}
 
 // Run a configurable number of async tasks in parallel. Resolves after all
 // tasks settle. Order of results matches input order.
@@ -38,10 +35,7 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
 
     let appsList
     try {
-        const response = await engine.query(APPS_QUERY)
-        appsList = Array.isArray(response.apps)
-            ? response.apps
-            : response.apps?.apps || []
+        appsList = await fetchInstalledApps(engine)
     } catch (error) {
         callbacks.onListFailed?.(error)
         callbacks.onComplete?.([])

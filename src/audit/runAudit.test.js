@@ -196,6 +196,7 @@ describe('runAudit', () => {
             users: () => ({ users: [], pager: { page: 1, pageCount: 1, total: 0 } }),
             'configuration/corsWhitelist': () => [],
             me: () => ({ id: 'me' }),
+            apps: () => [],
         })
 
     it('invokes lifecycle callbacks in order', async () => {
@@ -248,12 +249,12 @@ describe('runAudit', () => {
         expect(corsWhitelistError.override).toBeNull()
     })
 
-    it('runs all 21 checks', async () => {
+    it('runs all 22 checks', async () => {
         const seen = new Set()
         await runAudit(minimalEngine(), TEST_CONFIG, {
             onStart: (check) => seen.add(check.id),
         })
-        expect(seen.size).toBe(21)
+        expect(seen.size).toBe(22)
     })
 
     it('completes even when prefetch fully fails (degrades to "unavailable" findings)', async () => {
