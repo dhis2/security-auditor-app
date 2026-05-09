@@ -2,41 +2,32 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding: 16px;
+    margin-top: 24px;
 }
 
 .card {
     padding: 16px;
 }
 
-.actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 8px;
-}
-
-/* Card-internal header row: title/description on the left, primary action
- * button flush to the right. Used for the "start" idle state and matches
- * the layout used by AuditFindings so both audit cards align visually. */
-.cardHeaderRow {
+/* NoticeBox children layout: text/description on the left, primary action
+ * flush to the right. Used so the idle/error/completed states all expose
+ * their action button inside the same panel that holds the message. */
+.noticeRow {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
 }
 
-.cardHeaderText {
+.noticeText {
     flex: 1;
     min-width: 0;
 }
 
-.cardHeaderText h3 {
-    margin: 0 0 8px 0;
-}
-
-.cardHeaderText p {
-    margin: 0;
+.reportButton {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
 }
 
 .progressLabel {

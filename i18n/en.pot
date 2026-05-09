@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-09T04:48:56.252Z\n"
-"PO-Revision-Date: 2026-05-09T04:48:56.252Z\n"
+"POT-Creation-Date: 2026-05-09T05:10:26.528Z\n"
+"PO-Revision-Date: 2026-05-09T05:10:26.528Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -523,6 +523,9 @@ msgstr ""
 msgid "No users with {{authority}} authority found."
 msgstr "No users with {{authority}} authority found."
 
+msgid "Bundled"
+msgstr "Bundled"
+
 msgid "App Hub"
 msgstr "App Hub"
 
@@ -555,6 +558,12 @@ msgstr "Details"
 
 msgid "Skipped ({{reason}})"
 msgstr "Skipped ({{reason}})"
+
+msgid "Unable to detect"
+msgstr "Unable to detect"
+
+msgid "Not disclosed"
+msgstr "Not disclosed"
 
 msgid "Apps Audit"
 msgstr "Apps Audit"
@@ -596,6 +605,27 @@ msgstr "Apps Audit completed with {{warnings}} warning(s). Review recommended."
 msgid "All scanned apps look clean."
 msgstr "All scanned apps look clean."
 
+msgid "Failed to generate report"
+msgstr "Failed to generate report"
+
+msgid "Generating..."
+msgstr "Generating..."
+
+msgid "Save Report"
+msgstr "Save Report"
+
+msgid "N/A"
+msgstr "N/A"
+
+msgid "DHIS2 Apps Audit Report"
+msgstr "DHIS2 Apps Audit Report"
+
+msgid "System Information"
+msgstr "System Information"
+
+msgid "App Findings"
+msgstr "App Findings"
+
 msgid "App"
 msgstr "App"
 
@@ -608,23 +638,14 @@ msgstr "Source"
 msgid "Status"
 msgstr "Status"
 
+msgid "Findings"
+msgstr "Findings"
+
 msgid "Running"
 msgstr "Running"
 
-msgid "Unable to detect"
-msgstr "Unable to detect"
-
-msgid "Not disclosed"
-msgstr "Not disclosed"
-
 msgid "DHIS2 Security Audit Report"
 msgstr "DHIS2 Security Audit Report"
-
-msgid "System Information"
-msgstr "System Information"
-
-msgid "N/A"
-msgstr "N/A"
 
 msgid "Security Findings"
 msgstr "Security Findings"
@@ -676,15 +697,6 @@ msgstr "Security audit completed with warnings. Review recommended."
 
 msgid "All security checks passed successfully!"
 msgstr "All security checks passed successfully!"
-
-msgid "Failed to generate report"
-msgstr "Failed to generate report"
-
-msgid "Generating..."
-msgstr "Generating..."
-
-msgid "Save Report"
-msgstr "Save Report"
 
 msgid "Configuration saved successfully"
 msgstr "Configuration saved successfully"
