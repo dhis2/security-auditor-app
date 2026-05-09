@@ -254,20 +254,18 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
     if (auditStatus === 'idle') {
         return (
             <div className={classes.container}>
-                <NoticeBox title={i18n.t('DHIS2 Audit')}>
-                    <div className={classes.noticeRow}>
-                        <div className={classes.noticeText}>
-                            {i18n.t(
-                                'Run the security audit against this DHIS2 instance. Checks user authorities, system settings, password policy, response headers, and other configuration.'
-                            )}
-                        </div>
-                        {onStartAudit && (
-                            <Button primary onClick={onStartAudit}>
-                                {i18n.t('Start DHIS2 Audit')}
-                            </Button>
+                <div className={classes.panelWithAction}>
+                    <NoticeBox title={i18n.t('DHIS2 Audit')}>
+                        {i18n.t(
+                            'Run the security audit against this DHIS2 instance. Checks user authorities, system settings, password policy, response headers, and other configuration.'
                         )}
-                    </div>
-                </NoticeBox>
+                    </NoticeBox>
+                    {onStartAudit && (
+                        <Button primary onClick={onStartAudit}>
+                            {i18n.t('Start DHIS2 Audit')}
+                        </Button>
+                    )}
+                </div>
             </div>
         )
     }
@@ -275,20 +273,18 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
     if (auditStatus === 'error') {
         return (
             <div className={classes.container}>
-                <NoticeBox error title={i18n.t('Audit Error')}>
-                    <div className={classes.noticeRow}>
-                        <div className={classes.noticeText}>
-                            {i18n.t(
-                                'An error occurred while running the security audit. Please try again.'
-                            )}
-                        </div>
-                        {onStartAudit && (
-                            <Button onClick={onStartAudit}>
-                                {i18n.t('Re-run DHIS2 Audit')}
-                            </Button>
+                <div className={classes.panelWithAction}>
+                    <NoticeBox error title={i18n.t('Audit Error')}>
+                        {i18n.t(
+                            'An error occurred while running the security audit. Please try again.'
                         )}
-                    </div>
-                </NoticeBox>
+                    </NoticeBox>
+                    {onStartAudit && (
+                        <Button onClick={onStartAudit}>
+                            {i18n.t('Re-run DHIS2 Audit')}
+                        </Button>
+                    )}
+                </div>
             </div>
         )
     }
@@ -308,33 +304,29 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
             )}
 
             {auditStatus === 'completed' && (
-                <NoticeBox
-                    title={i18n.t('Audit Completed')}
-                    warning={hasWarnings && !hasFailures}
-                    error={hasFailures}
-                    success={!hasWarnings && !hasFailures}
-                >
-                    <div className={classes.noticeRow}>
-                        <div className={classes.noticeText}>
-                            {hasFailures
-                                ? i18n.t(
-                                      'Critical security issues found. Please review the findings below.'
-                                  )
-                                : hasWarnings
-                                ? i18n.t(
-                                      'Security audit completed with warnings. Review recommended.'
-                                  )
-                                : i18n.t(
-                                      'All security checks passed successfully!'
-                                  )}
-                        </div>
-                        {onStartAudit && (
-                            <Button onClick={onStartAudit}>
-                                {i18n.t('Re-run DHIS2 Audit')}
-                            </Button>
-                        )}
-                    </div>
-                </NoticeBox>
+                <div className={classes.panelWithAction}>
+                    <NoticeBox
+                        title={i18n.t('Audit Completed')}
+                        warning={hasWarnings && !hasFailures}
+                        error={hasFailures}
+                        success={!hasWarnings && !hasFailures}
+                    >
+                        {hasFailures
+                            ? i18n.t(
+                                  'Critical security issues found. Please review the findings below.'
+                              )
+                            : hasWarnings
+                            ? i18n.t(
+                                  'Security audit completed with warnings. Review recommended.'
+                              )
+                            : i18n.t('All security checks passed successfully!')}
+                    </NoticeBox>
+                    {onStartAudit && (
+                        <Button onClick={onStartAudit}>
+                            {i18n.t('Re-run DHIS2 Audit')}
+                        </Button>
+                    )}
+                </div>
             )}
 
             {findings.length > 0 && (

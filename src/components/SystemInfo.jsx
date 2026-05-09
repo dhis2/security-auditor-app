@@ -33,19 +33,23 @@ export const SystemInfo = () => {
 
     if (loading) {
         return (
-            <Card className={classes.card}>
-                <CircularLoader />
-            </Card>
+            <div className={classes.container}>
+                <Card className={classes.card}>
+                    <CircularLoader />
+                </Card>
+            </div>
         )
     }
 
     if (error) {
         return (
-            <Card className={classes.card}>
-                <NoticeBox error title={i18n.t('Error')}>
-                    {`${i18n.t('Failed to load system information')}: ${error.message}`}
-                </NoticeBox>
-            </Card>
+            <div className={classes.container}>
+                <Card className={classes.card}>
+                    <NoticeBox error title={i18n.t('Error')}>
+                        {`${i18n.t('Failed to load system information')}: ${error.message}`}
+                    </NoticeBox>
+                </Card>
+            </div>
         )
     }
 
@@ -59,24 +63,26 @@ export const SystemInfo = () => {
     }))
 
     return (
-        <Card className={classes.card}>
-            <div className={classes.header}>
-                <h3 className={classes.title}>{i18n.t('System Information')}</h3>
-                <p className={classes.subtitle}>
-                    {i18n.t(
-                        'Information about the DHIS2 instance and server environment'
-                    )}
-                </p>
-            </div>
+        <div className={classes.container}>
+            <Card className={classes.card}>
+                <div className={classes.header}>
+                    <h3 className={classes.title}>{i18n.t('System Information')}</h3>
+                    <p className={classes.subtitle}>
+                        {i18n.t(
+                            'Information about the DHIS2 instance and server environment'
+                        )}
+                    </p>
+                </div>
 
-            <div className={classes.infoGrid}>
-                {infoItems.map((item, index) => (
-                    <div key={index} className={classes.infoItem}>
-                        <dt className={classes.label}>{item.label}</dt>
-                        <dd className={classes.value}>{item.value}</dd>
-                    </div>
-                ))}
-            </div>
-        </Card>
+                <div className={classes.infoGrid}>
+                    {infoItems.map((item, index) => (
+                        <div key={index} className={classes.infoItem}>
+                            <dt className={classes.label}>{item.label}</dt>
+                            <dd className={classes.value}>{item.value}</dd>
+                        </div>
+                    ))}
+                </div>
+            </Card>
+        </div>
     )
 }
