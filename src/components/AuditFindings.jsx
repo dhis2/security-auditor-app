@@ -398,11 +398,6 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
                                     ? i18n.t('Generating...')
                                     : i18n.t('Save Report')}
                             </Button>
-                            {onStartAudit && (
-                                <Button onClick={onStartAudit}>
-                                    {i18n.t('Re-run DHIS2 Audit')}
-                                </Button>
-                            )}
                         </div>
                     )}
                 </>
