@@ -167,14 +167,16 @@ export const ConfigurationPanel = () => {
 
     if (loading) {
         return (
-            <Card className={classes.card}>
-                <CircularLoader />
-            </Card>
+            <div className={classes.container}>
+                <Card className={classes.card}>
+                    <CircularLoader />
+                </Card>
+            </div>
         )
     }
 
     return (
-        <>
+        <div className={classes.container}>
         <Card className={classes.card}>
             <div className={classes.header}>
                 <h3 className={classes.title}>{i18n.t('Security Audit Configuration')}</h3>
@@ -304,6 +306,6 @@ export const ConfigurationPanel = () => {
                 </Button>
             </ButtonStrip>
         </Card>
-    </>
+    </div>
     )
 }

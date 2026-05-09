@@ -1,5 +1,12 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 24px;
+}
+
 .card {
-    margin: 16px 0;
+    margin: 0;
 }
 
 .header {

@@ -4,6 +4,7 @@ import classes from './Console.module.css'
 
 export const Console = ({ apiResponses }) => {
     return (
+        <div className={classes.container}>
         <Card className={classes.card}>
             <div className={classes.header}>
                 <h3 className={classes.title}>{i18n.t('API Console')}</h3>
@@ -42,5 +43,6 @@ export const Console = ({ apiResponses }) => {
                 )}
             </div>
         </Card>
+        </div>
     )
 }

@@ -1,4 +1,5 @@
 import '../../i18nConfig'
+import { getAppSourceChecks } from './appSources'
 import { getAuthorityChecks, PRIVILEGED_AUTHORITIES } from './authorities'
 import { getConnectionChecks } from './connection'
 import { getHeaderChecks } from './headers'
@@ -18,4 +19,5 @@ export const getSecurityChecks = (config) => [
     ...getSettingsChecks(config),
     ...getConnectionChecks(),
     ...getHeaderChecks(),
+    ...getAppSourceChecks(),
 ]

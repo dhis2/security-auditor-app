@@ -1,6 +1,12 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 24px;
+}
+
 .card {
     padding: 24px;
-    margin-bottom: 24px;
 }
 
 .header {

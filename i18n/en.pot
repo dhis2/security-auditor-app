@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-09T05:25:59.480Z\n"
-"PO-Revision-Date: 2026-05-09T05:25:59.480Z\n"
+"POT-Creation-Date: 2026-05-09T06:08:35.857Z\n"
+"PO-Revision-Date: 2026-05-09T06:08:35.857Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -32,6 +32,39 @@ msgstr "No <script src> entries found in index.html"
 
 msgid "file exceeds size limit"
 msgstr "file exceeds size limit"
+
+msgid "Installed App Sources"
+msgstr "Installed App Sources"
+
+msgid ""
+"Checks whether any installed apps come from outside the App Hub or DHIS2 "
+"bundle"
+msgstr ""
+"Checks whether any installed apps come from outside the App Hub or DHIS2 "
+"bundle"
+
+msgid "No installed apps detected"
+msgstr "No installed apps detected"
+
+msgid "{{manualCount}} of {{total}} installed app(s) are from outside the App Hub"
+msgstr "{{manualCount}} of {{total}} installed app(s) are from outside the App Hub"
+
+msgid ""
+"Manually installed apps — {{sample}} and {{more}} more. Run the Apps Audit "
+"for malware analysis."
+msgstr ""
+"Manually installed apps — {{sample}} and {{more}} more. Run the Apps Audit "
+"for malware analysis."
+
+msgid ""
+"Manually installed apps — {{sample}}. Run the Apps Audit for malware "
+"analysis."
+msgstr ""
+"Manually installed apps — {{sample}}. Run the Apps Audit for malware "
+"analysis."
+
+msgid "Could not fetch installed apps"
+msgstr "Could not fetch installed apps"
 
 msgid "Users With ALL Authority"
 msgstr "Users With ALL Authority"
@@ -945,3 +978,11 @@ msgstr ""
 "Threshold for the number of users holding privileged authorities (ALL, "
 "F_PUBLIC_ROUTE_ADD, F_IMPERSONATE_USER, or F_SYSTEM_SETTING) before a "
 "warning is raised"
+
+msgctxt "Application title"
+msgid "__MANIFEST_APP_TITLE"
+msgstr "Security Auditor"
+
+msgctxt "Application description"
+msgid "__MANIFEST_APP_DESCRIPTION"
+msgstr "DHIS2 Security Auditor"
