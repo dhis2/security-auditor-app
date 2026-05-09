@@ -227,18 +227,16 @@ export const AppsAudit = ({
     if (status === 'idle') {
         return (
             <div className={classes.container}>
-                <NoticeBox title={i18n.t('Apps Audit')}>
-                    <div className={classes.noticeRow}>
-                        <div className={classes.noticeText}>
-                            {i18n.t(
-                                'Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious JavaScript. Each app is fetched from this server and analyzed locally; nothing is uploaded externally.'
-                            )}
-                        </div>
-                        <Button primary onClick={onStart}>
-                            {i18n.t('Start Apps Audit')}
-                        </Button>
-                    </div>
-                </NoticeBox>
+                <div className={classes.panelWithAction}>
+                    <NoticeBox title={i18n.t('Apps Audit')}>
+                        {i18n.t(
+                            'Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious JavaScript. Each app is fetched from this server and analyzed locally; nothing is uploaded externally.'
+                        )}
+                    </NoticeBox>
+                    <Button primary onClick={onStart}>
+                        {i18n.t('Start Apps Audit')}
+                    </Button>
+                </div>
             </div>
         )
     }
@@ -261,19 +259,17 @@ export const AppsAudit = ({
     if (status === 'error' && results.length === 0) {
         return (
             <div className={classes.container}>
-                <NoticeBox error title={i18n.t('Apps Audit failed')}>
-                    <div className={classes.noticeRow}>
-                        <div className={classes.noticeText}>
-                            {error ||
-                                i18n.t(
-                                    'Could not list installed apps. The user may lack permission to read /api/apps.'
-                                )}
-                        </div>
-                        <Button onClick={onStart}>
-                            {i18n.t('Re-run Apps Audit')}
-                        </Button>
-                    </div>
-                </NoticeBox>
+                <div className={classes.panelWithAction}>
+                    <NoticeBox error title={i18n.t('Apps Audit failed')}>
+                        {error ||
+                            i18n.t(
+                                'Could not list installed apps. The user may lack permission to read /api/apps.'
+                            )}
+                    </NoticeBox>
+                    <Button onClick={onStart}>
+                        {i18n.t('Re-run Apps Audit')}
+                    </Button>
+                </div>
             </div>
         )
     }
@@ -283,31 +279,29 @@ export const AppsAudit = ({
     const warnings = results.filter((r) => r.status === 'warning').length
     return (
         <div className={classes.container}>
-            <NoticeBox
-                title={i18n.t('Apps Audit completed')}
-                error={failures > 0}
-                warning={warnings > 0 && failures === 0}
-                success={failures === 0 && warnings === 0}
-            >
-                <div className={classes.noticeRow}>
-                    <div className={classes.noticeText}>
-                        {failures > 0
-                            ? i18n.t(
-                                  'Found {{failures}} app(s) with failing findings. Review the details below.',
-                                  { failures }
-                              )
-                            : warnings > 0
-                            ? i18n.t(
-                                  'Apps Audit completed with {{warnings}} warning(s). Review recommended.',
-                                  { warnings }
-                              )
-                            : i18n.t('All scanned apps look clean.')}
-                    </div>
-                    <Button onClick={onStart}>
-                        {i18n.t('Re-run Apps Audit')}
-                    </Button>
-                </div>
-            </NoticeBox>
+            <div className={classes.panelWithAction}>
+                <NoticeBox
+                    title={i18n.t('Apps Audit completed')}
+                    error={failures > 0}
+                    warning={warnings > 0 && failures === 0}
+                    success={failures === 0 && warnings === 0}
+                >
+                    {failures > 0
+                        ? i18n.t(
+                              'Found {{failures}} app(s) with failing findings. Review the details below.',
+                              { failures }
+                          )
+                        : warnings > 0
+                        ? i18n.t(
+                              'Apps Audit completed with {{warnings}} warning(s). Review recommended.',
+                              { warnings }
+                          )
+                        : i18n.t('All scanned apps look clean.')}
+                </NoticeBox>
+                <Button onClick={onStart}>
+                    {i18n.t('Re-run Apps Audit')}
+                </Button>
+            </div>
             <ResultsTable results={results} />
             <div className={classes.reportButton}>
                 {exportError && (

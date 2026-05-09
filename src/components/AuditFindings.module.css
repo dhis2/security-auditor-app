@@ -9,17 +9,17 @@
     padding: 16px;
 }
 
-/* NoticeBox children layout: text/description on the left, primary action
- * flush to the right. Used so the idle/error/completed states all expose
- * their action button inside the same panel that holds the message. */
-.noticeRow {
+/* Outer row that pairs a NoticeBox with its primary action. The NoticeBox
+ * grows to fill available width; the button sits flush to the right edge of
+ * the row and is vertically centered against the NoticeBox's full height
+ * (title + body), not just the body content. */
+.panelWithAction {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 16px;
 }
 
-.noticeText {
+.panelWithAction > :first-child {
     flex: 1;
     min-width: 0;
 }

@@ -6,18 +6,22 @@ import { findScripts } from './findScripts'
 // "skipped: too large" entry.
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 
-// Warning kinds that are too noisy to surface on minified production bundles.
-// On non-minified files we let them through, where the same patterns are
-// rarer and more likely to be meaningful.
+// Warning kinds that carry near-zero signal in practice and are dropped
+// unconditionally. We tried gating these on js-x-ray's `isMinified` flag,
+// but that heuristic stays false on many real React/Vite bundles whose
+// surviving DOM/Fiber identifier names (focusedElem, selectionRange,
+// containerInfo, parentNode, …) push the identifier-length average back up.
 //
-//   unsafe-assign  — fires on any `obj[dynamicKey] = value` shape, which any
-//                    React/Vite build emits hundreds of times legitimately
-//                    (event handlers, fiber tree walks).
+//   unsafe-assign  — fires on any `obj[someProperty] = value` shape. Hits
+//                    React reconciler bookkeeping (e.alternate, c.stateNode,
+//                    r.tag, …) and DOM property writes constantly.
 //   unsafe-regex   — safe-regex star-height check; matches moment's ISO-8601
 //                    parser and similar bounded-but-nested patterns shipped
-//                    by date/parsing libs. Bundled code triggers many false
-//                    positives.
-const NOISY_KINDS_ON_MINIFIED = new Set(['unsafe-assign', 'unsafe-regex'])
+//                    by date/parsing libs.
+//
+// Strong-signal kinds (obfuscated-code, unsafe-import, unsafe-stmt,
+// encoded-literal, weak-crypto, suspicious-literal) still flow through.
+const NOISY_KINDS = new Set(['unsafe-assign', 'unsafe-regex'])
 
 // Derive the DHIS2 context path from the running URL when systemInfo isn't
 // available. Apps are served at <contextPath>/api/apps/<key>/... so the
@@ -124,15 +128,13 @@ const scanFile = async (src, absoluteUrl, analyze, fetchText) => {
     }
     try {
         const result = analyze(source)
-        const isMinified = !!result?.isMinified
-        const rawWarnings = result?.warnings || []
-        const warnings = isMinified
-            ? rawWarnings.filter((w) => !NOISY_KINDS_ON_MINIFIED.has(w.kind))
-            : rawWarnings
+        const warnings = (result?.warnings || []).filter(
+            (w) => !NOISY_KINDS.has(w.kind)
+        )
         return {
             src,
             warnings,
-            isMinified,
+            isMinified: !!result?.isMinified,
             sizeBytes: source.length,
         }
     } catch (err) {
