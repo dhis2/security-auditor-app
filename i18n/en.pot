@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-08T22:49:16.850Z\n"
-"PO-Revision-Date: 2026-05-08T22:49:16.850Z\n"
+"POT-Creation-Date: 2026-05-09T04:48:56.252Z\n"
+"PO-Revision-Date: 2026-05-09T04:48:56.252Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -26,6 +26,12 @@ msgid ""
 msgstr ""
 "This tool is available for administrators only. You need the {{authAll}} or "
 "{{authSystemSetting}} authority to access the Security Auditor."
+
+msgid "No <script src> entries found in index.html"
+msgstr "No <script src> entries found in index.html"
+
+msgid "file exceeds size limit"
+msgstr "file exceeds size limit"
 
 msgid "Users With ALL Authority"
 msgstr "Users With ALL Authority"
@@ -517,6 +523,15 @@ msgstr ""
 msgid "No users with {{authority}} authority found."
 msgstr "No users with {{authority}} authority found."
 
+msgid "App Hub"
+msgstr "App Hub"
+
+msgid "Manual"
+msgstr "Manual"
+
+msgid "Unknown"
+msgstr "Unknown"
+
 msgid "Pass"
 msgstr "Pass"
 
@@ -528,9 +543,6 @@ msgstr "Fail"
 
 msgid "Info"
 msgstr "Info"
-
-msgid "Unknown"
-msgstr "Unknown"
 
 msgid "{{current}} of {{total}} apps scanned"
 msgstr "{{current}} of {{total}} apps scanned"
@@ -589,6 +601,9 @@ msgstr "App"
 
 msgid "Version"
 msgstr "Version"
+
+msgid "Source"
+msgstr "Source"
 
 msgid "Status"
 msgstr "Status"

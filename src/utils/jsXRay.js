@@ -7,10 +7,17 @@ let analyzerPromise = null
 
 export const getAnalyzer = () => {
     if (!analyzerPromise) {
-        analyzerPromise = import('js-x-ray').then((mod) => {
-            // js-x-ray's analyzer entry point. Newer versions expose
-            // `runASTAnalysis`; if the API ever changes we surface a clear
-            // error rather than failing silently inside the runner.
+        analyzerPromise = (async () => {
+            // js-x-ray's sec-literal dependency uses Node's Buffer for
+            // base64 inspection. Browsers don't have it, so we polyfill
+            // before loading the analyzer. Ordering matters — js-x-ray
+            // captures the global at module init.
+            if (typeof globalThis.Buffer === 'undefined') {
+                const { Buffer } = await import('buffer')
+                globalThis.Buffer = Buffer
+            }
+
+            const mod = await import('js-x-ray')
             const fn = mod.runASTAnalysis || mod.default?.runASTAnalysis
             if (typeof fn !== 'function') {
                 throw new Error(
@@ -18,7 +25,7 @@ export const getAnalyzer = () => {
                 )
             }
             return fn
-        })
+        })()
     }
     return analyzerPromise
 }

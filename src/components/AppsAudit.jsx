@@ -12,7 +12,18 @@ import {
     TableCell,
 } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
+import { APP_SOURCE, appSource } from '../audit/apps/appSource'
 import classes from './AppsAudit.module.css'
+
+const sourceLabel = (source) => {
+    if (source === APP_SOURCE.APP_HUB) {
+        return i18n.t('App Hub')
+    }
+    if (source === APP_SOURCE.MANUAL) {
+        return i18n.t('Manual')
+    }
+    return i18n.t('Unknown')
+}
 
 const STATUS_CLASS = {
     pass: classes.statusPass,
@@ -72,6 +83,7 @@ const AppRow = ({ result }) => {
         status !== 'pass' &&
         ((result.files && result.files.length > 0) || result.error)
 
+    const source = appSource(result.app)
     return (
         <>
             <TableRow>
@@ -82,6 +94,7 @@ const AppRow = ({ result }) => {
                     <div className={classes.appKey}>{result.app.key}</div>
                 </TableCell>
                 <TableCell>{result.app.version || '-'}</TableCell>
+                <TableCell>{sourceLabel(source)}</TableCell>
                 <TableCell>
                     <StatusBadge status={status} />
                 </TableCell>
@@ -99,7 +112,7 @@ const AppRow = ({ result }) => {
             </TableRow>
             {expanded && (
                 <TableRow>
-                    <TableCell colSpan="4">
+                    <TableCell colSpan="5">
                         <div className={classes.details}>
                             {result.error && (
                                 <div className={classes.warningRow}>
@@ -268,6 +281,7 @@ const ResultsTable = ({ results }) => {
                     <TableRowHead>
                         <TableCellHead>{i18n.t('App')}</TableCellHead>
                         <TableCellHead>{i18n.t('Version')}</TableCellHead>
+                        <TableCellHead>{i18n.t('Source')}</TableCellHead>
                         <TableCellHead>{i18n.t('Status')}</TableCellHead>
                         <TableCellHead>{''}</TableCellHead>
                     </TableRowHead>
