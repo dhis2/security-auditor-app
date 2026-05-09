@@ -1,33 +1,27 @@
 .container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
     margin-top: 24px;
 }
 
 .card {
-    margin-top: 16px;
     padding: 16px;
 }
 
-/* Card-internal header row: title/description on the left, primary action
- * button flush to the right. Mirrors the same pattern in AppsAudit so the
- * two audit cards align visually. */
-.cardHeaderRow {
+/* NoticeBox children layout: text/description on the left, primary action
+ * flush to the right. Used so the idle/error/completed states all expose
+ * their action button inside the same panel that holds the message. */
+.noticeRow {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
 }
 
-.cardHeaderText {
+.noticeText {
     flex: 1;
     min-width: 0;
-}
-
-.cardHeaderText h3 {
-    margin: 0 0 8px 0;
-}
-
-.cardHeaderText p {
-    margin: 0;
 }
 
 .statusBadge {

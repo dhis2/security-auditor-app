@@ -6,6 +6,19 @@ import { findScripts } from './findScripts'
 // "skipped: too large" entry.
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 
+// Warning kinds that are too noisy to surface on minified production bundles.
+// On non-minified files we let them through, where the same patterns are
+// rarer and more likely to be meaningful.
+//
+//   unsafe-assign  — fires on any `obj[dynamicKey] = value` shape, which any
+//                    React/Vite build emits hundreds of times legitimately
+//                    (event handlers, fiber tree walks).
+//   unsafe-regex   — safe-regex star-height check; matches moment's ISO-8601
+//                    parser and similar bounded-but-nested patterns shipped
+//                    by date/parsing libs. Bundled code triggers many false
+//                    positives.
+const NOISY_KINDS_ON_MINIFIED = new Set(['unsafe-assign', 'unsafe-regex'])
+
 // Derive the DHIS2 context path from the running URL when systemInfo isn't
 // available. Apps are served at <contextPath>/api/apps/<key>/... so the
 // substring before "/api/apps/" is the contextPath.
@@ -111,10 +124,15 @@ const scanFile = async (src, absoluteUrl, analyze, fetchText) => {
     }
     try {
         const result = analyze(source)
+        const isMinified = !!result?.isMinified
+        const rawWarnings = result?.warnings || []
+        const warnings = isMinified
+            ? rawWarnings.filter((w) => !NOISY_KINDS_ON_MINIFIED.has(w.kind))
+            : rawWarnings
         return {
             src,
-            warnings: result?.warnings || [],
-            isMinified: !!result?.isMinified,
+            warnings,
+            isMinified,
             sizeBytes: source.length,
         }
     } catch (err) {
