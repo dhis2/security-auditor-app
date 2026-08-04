@@ -17,6 +17,9 @@ updates:
           interval: weekly
       open-pull-requests-limit: 5
       groups:
+          # Version updates. A group without `applies-to` covers version
+          # updates only -- security updates ignore these and open one PR per
+          # advisory unless explicitly grouped below.
           dhis2:
               patterns: ['@dhis2/*']
           dev-dependencies:
@@ -24,6 +27,17 @@ updates:
           production-dependencies:
               dependency-type: production
               exclude-patterns: ['@dhis2/*']
+
+          # Security updates. Kept split by dependency-type so runtime fixes
+          # stay visible instead of being buried in a large dev batch -- the
+          # build toolchain accounts for the overwhelming majority of npm
+          # advisories here.
+          production-security:
+              applies-to: security-updates
+              dependency-type: production
+          development-security:
+              applies-to: security-updates
+              dependency-type: development
 
     # Dev container Features (node, git, npm-package)
     - package-ecosystem: devcontainers
