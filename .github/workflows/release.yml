@@ -5,6 +5,18 @@ on:
     types: [closed]
     branches: [main]
 
+# Releases mutate main (version bump + tag), so they must never run in
+# parallel. Without this, merging several PRs in quick succession makes every
+# release job read the same package.json, compute the same version, and race
+# to push -- all but one fail with "Expected branch to point to <sha>".
+# A fixed group name serializes across PRs; github.ref would not, since each
+# pull_request event carries its own refs/pull/N/merge ref.
+# cancel-in-progress stays false: cancelling mid-run could leave a pushed tag
+# with no matching release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     if: github.event.pull_request.merged == true && (contains(github.event.pull_request.labels.*.name, 'patch') || contains(github.event.pull_request.labels.*.name, 'minor') || contains(github.event.pull_request.labels.*.name, 'major'))
