@@ -1,5 +1,4 @@
 import { CustomDataProvider } from '@dhis2/app-runtime'
-import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 

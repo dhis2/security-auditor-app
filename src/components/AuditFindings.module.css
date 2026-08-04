@@ -1,9 +1,27 @@
 .container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
     margin-top: 24px;
 }
 
 .card {
-    margin-top: 16px;
+    padding: 16px;
+}
+
+/* Outer row that pairs a NoticeBox with its primary action. The NoticeBox
+ * grows to fill available width; the button sits flush to the right edge of
+ * the row and is vertically centered against the NoticeBox's full height
+ * (title + body), not just the body content. */
+.panelWithAction {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.panelWithAction > :first-child {
+    flex: 1;
+    min-width: 0;
 }
 
 .statusBadge {

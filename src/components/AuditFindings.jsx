@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import {
     Card,
     NoticeBox,
@@ -12,15 +12,14 @@ import {
     TableCell,
     Button,
 } from '@dhis2/ui'
-import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
+import { useInstanceInfo } from '../hooks/useInstanceInfo'
+import { APP_VERSION as appVersion } from '../version'
+import { downloadBlob } from '../utils/download'
+import { escapeHtml } from '../utils/html'
+import { getServerHeader } from '../utils/instanceInfo'
+import { getReportSystemInfoItems } from '../utils/systemInfoItems'
 import classes from './AuditFindings.module.css'
-
-const systemInfoQuery = {
-    systemInfo: {
-        resource: 'system/info',
-    },
-}
 
 const StatusBadge = ({ status }) => {
     const getStatusConfig = (status) => {
@@ -64,35 +63,23 @@ const StatusBadge = ({ status }) => {
     )
 }
 
-export const AuditFindings = ({ findings, auditStatus, progress }) => {
+export const AuditFindings = ({ findings, auditStatus, progress, onStartAudit }) => {
     const [generating, setGenerating] = useState(false)
-    const [webServer, setWebServer] = useState('Loading...')
-    const { data: systemInfoData } = useDataQuery(systemInfoQuery)
+    const [exportError, setExportError] = useState(null)
+    const { systemInfo: sharedSystemInfo } = useInstanceInfo()
 
-    const generatePDFReport = async () => {
+    const generateHtmlReport = async () => {
         setGenerating(true)
+        setExportError(null)
 
         try {
-            const systemInfo = systemInfoData?.systemInfo || {}
-
-            // Fetch web server info
-            let serverHeader = 'Unable to detect'
-            try {
-                const contextPath = systemInfo.contextPath
-                const apiUrl = contextPath ? `${contextPath}/api/me` : '../api/me'
-                const response = await fetch(
-                    apiUrl,
-                    {
-                        method: 'GET',
-                        credentials: 'include',
-                    }
-                )
-                serverHeader = response.headers.get('server') || 'Not disclosed'
-            } catch (error) {
-                serverHeader = 'Unable to detect'
-            }
+            const systemInfo = sharedSystemInfo || {}
+            const fetchedHeader = await getServerHeader(systemInfo.contextPath)
+            const serverHeader =
+                fetchedHeader === null
+                    ? i18n.t('Unable to detect')
+                    : fetchedHeader || i18n.t('Not disclosed')
             const reportDate = new Date().toLocaleString()
-            const appVersion = '1.0.0' // Version from package.json
 
             // Create HTML content for the report
             let htmlContent = `
@@ -100,7 +87,7 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>DHIS2 Security Audit Report</title>
+    <title>${escapeHtml(i18n.t('DHIS2 Security Audit Report'))}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -188,91 +175,58 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
     </style>
 </head>
 <body>
-    <h1>DHIS2 Security Audit Report</h1>
+    <h1>${escapeHtml(i18n.t('DHIS2 Security Audit Report'))}</h1>
     <div class="header-info">
-        <strong>Report Generated:</strong> ${reportDate}<br>
-        <strong>Total Checks:</strong> ${findings.length}<br>
-        <strong>Failed:</strong> ${findings.filter(f => f.status === 'fail').length}<br>
-        <strong>Warnings:</strong> ${findings.filter(f => f.status === 'warning').length}<br>
-        <strong>Passed:</strong> ${findings.filter(f => f.status === 'pass').length}
+        <strong>${escapeHtml(i18n.t('Report Generated:'))}</strong> ${escapeHtml(reportDate)}<br>
+        <strong>${escapeHtml(i18n.t('Total Checks:'))}</strong> ${findings.length}<br>
+        <strong>${escapeHtml(i18n.t('Failed:'))}</strong> ${findings.filter(f => f.status === 'fail').length}<br>
+        <strong>${escapeHtml(i18n.t('Warnings:'))}</strong> ${findings.filter(f => f.status === 'warning').length}<br>
+        <strong>${escapeHtml(i18n.t('Passed:'))}</strong> ${findings.filter(f => f.status === 'pass').length}
     </div>
 
-    <h2>System Information</h2>
+    <h2>${escapeHtml(i18n.t('System Information'))}</h2>
     <div class="system-info">
-        <div class="info-item">
-            <div class="info-label">Security Auditor Version</div>
-            <div class="info-value">${appVersion}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Server URL</div>
-            <div class="info-value">${systemInfo.instanceBaseUrl || window.location.origin}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">System ID</div>
-            <div class="info-value">${systemInfo.systemId || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">DHIS2 Version</div>
-            <div class="info-value">${systemInfo.version || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Build Revision</div>
-            <div class="info-value">${systemInfo.revision || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Operating System</div>
-            <div class="info-value">${systemInfo.osName || 'N/A'} ${systemInfo.osVersion || ''}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Java Version</div>
-            <div class="info-value">${systemInfo.javaVersion || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Servlet Container</div>
-            <div class="info-value">${systemInfo.serverInfo || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Web Server</div>
-            <div class="info-value">${serverHeader}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Database</div>
-            <div class="info-value">${systemInfo.databaseInfo?.name || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">Database Version</div>
-            <div class="info-value">${systemInfo.databaseInfo?.databaseVersion || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-            <div class="info-label">External Directory</div>
-            <div class="info-value">${systemInfo.externalDirectory || 'N/A'}</div>
-        </div>
+${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
+    .map(
+        (item) => `        <div class="info-item">
+            <div class="info-label">${escapeHtml(item.label)}</div>
+            <div class="info-value">${escapeHtml(item.value || i18n.t('N/A'))}</div>
+        </div>`
+    )
+    .join('\n')}
     </div>
 
-    <h2>Security Findings</h2>
+    <h2>${escapeHtml(i18n.t('Security Findings'))}</h2>
     <table>
         <thead>
             <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Result</th>
+                <th>${escapeHtml(i18n.t('Check'))}</th>
+                <th>${escapeHtml(i18n.t('Status'))}</th>
+                <th>${escapeHtml(i18n.t('Result'))}</th>
             </tr>
         </thead>
         <tbody>
 `
 
+            const STATUS_CLASSES = {
+                pass: 'status-pass',
+                warning: 'status-warning',
+                fail: 'status-fail',
+                error: 'status-error',
+            }
             findings.forEach((finding) => {
-                const statusClass = `status-${finding.status}`
+                const statusClass = STATUS_CLASSES[finding.status] || 'status-error'
+                const statusLabel = (finding.status || 'unknown').toUpperCase()
                 htmlContent += `
             <tr>
                 <td>
-                    <strong>${finding.title}</strong><br>
-                    <span style="font-size: 0.9em; color: #666;">${finding.description}</span>
+                    <strong>${escapeHtml(finding.title)}</strong><br>
+                    <span style="font-size: 0.9em; color: #666;">${escapeHtml(finding.description)}</span>
                 </td>
-                <td class="${statusClass}">${finding.status.toUpperCase()}</td>
+                <td class="${statusClass}">${escapeHtml(statusLabel)}</td>
                 <td>
-                    ${finding.message || ''}
-                    ${finding.details ? `<div class="details">${finding.details}</div>` : ''}
+                    ${escapeHtml(finding.message || '')}
+                    ${finding.details ? `<div class="details">${escapeHtml(finding.details)}</div>` : ''}
                 </td>
             </tr>
 `
@@ -285,18 +239,13 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 </html>
 `
 
-            // Create blob and download
             const blob = new Blob([htmlContent], { type: 'text/html' })
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `dhis2-security-audit-${new Date().toISOString().split('T')[0]}.html`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
+            downloadBlob(
+                blob,
+                `dhis2-security-audit-${new Date().toISOString().split('T')[0]}.html`
+            )
         } catch (error) {
-            console.error('Error generating report:', error)
+            setExportError(error.message || i18n.t('Unknown error'))
         } finally {
             setGenerating(false)
         }
@@ -304,21 +253,39 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 
     if (auditStatus === 'idle') {
         return (
-            <NoticeBox title={i18n.t('Ready to audit')}>
-                {i18n.t(
-                    'Click "Start Audit" to begin the security assessment.'
-                )}
-            </NoticeBox>
+            <div className={classes.container}>
+                <div className={classes.panelWithAction}>
+                    <NoticeBox title={i18n.t('DHIS2 Audit')}>
+                        {i18n.t(
+                            'Run the security audit against this DHIS2 instance. Checks user authorities, system settings, password policy, response headers, and other configuration.'
+                        )}
+                    </NoticeBox>
+                    {onStartAudit && (
+                        <Button primary onClick={onStartAudit}>
+                            {i18n.t('Start DHIS2 Audit')}
+                        </Button>
+                    )}
+                </div>
+            </div>
         )
     }
 
     if (auditStatus === 'error') {
         return (
-            <NoticeBox error title={i18n.t('Audit Error')}>
-                {i18n.t(
-                    'An error occurred while running the security audit. Please try again.'
-                )}
-            </NoticeBox>
+            <div className={classes.container}>
+                <div className={classes.panelWithAction}>
+                    <NoticeBox error title={i18n.t('Audit Error')}>
+                        {i18n.t(
+                            'An error occurred while running the security audit. Please try again.'
+                        )}
+                    </NoticeBox>
+                    {onStartAudit && (
+                        <Button onClick={onStartAudit}>
+                            {i18n.t('Re-run DHIS2 Audit')}
+                        </Button>
+                    )}
+                </div>
+            </div>
         )
     }
 
@@ -337,22 +304,29 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
             )}
 
             {auditStatus === 'completed' && (
-                <NoticeBox
-                    title={i18n.t('Audit Completed')}
-                    warning={hasWarnings && !hasFailures}
-                    error={hasFailures}
-                    success={!hasWarnings && !hasFailures}
-                >
-                    {hasFailures
-                        ? i18n.t(
-                              'Critical security issues found. Please review the findings below.'
-                          )
-                        : hasWarnings
-                        ? i18n.t(
-                              'Security audit completed with warnings. Review recommended.'
-                          )
-                        : i18n.t('All security checks passed successfully!')}
-                </NoticeBox>
+                <div className={classes.panelWithAction}>
+                    <NoticeBox
+                        title={i18n.t('Audit Completed')}
+                        warning={hasWarnings && !hasFailures}
+                        error={hasFailures}
+                        success={!hasWarnings && !hasFailures}
+                    >
+                        {hasFailures
+                            ? i18n.t(
+                                  'Critical security issues found. Please review the findings below.'
+                              )
+                            : hasWarnings
+                            ? i18n.t(
+                                  'Security audit completed with warnings. Review recommended.'
+                              )
+                            : i18n.t('All security checks passed successfully!')}
+                    </NoticeBox>
+                    {onStartAudit && (
+                        <Button onClick={onStartAudit}>
+                            {i18n.t('Re-run DHIS2 Audit')}
+                        </Button>
+                    )}
+                </div>
             )}
 
             {findings.length > 0 && (
@@ -410,8 +384,16 @@ export const AuditFindings = ({ findings, auditStatus, progress }) => {
 
                     {auditStatus === 'completed' && (
                         <div className={classes.reportButton}>
+                            {exportError && (
+                                <NoticeBox
+                                    error
+                                    title={i18n.t('Failed to generate report')}
+                                >
+                                    {exportError}
+                                </NoticeBox>
+                            )}
                             <Button
-                                onClick={generatePDFReport}
+                                onClick={generateHtmlReport}
                                 disabled={generating}
                             >
                                 {generating

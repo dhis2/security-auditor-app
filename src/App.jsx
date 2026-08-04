@@ -1,9 +1,11 @@
-import React from 'react'
 import './locales'
+import './i18nConfig'
 import { useDataQuery } from '@dhis2/app-runtime'
 import { Card, NoticeBox, CircularLoader } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { SecurityAuditor } from './components/SecurityAuditor'
+import { AuditConfigProvider } from './hooks/useAuditConfig'
+import { InstanceInfoProvider } from './hooks/useInstanceInfo'
 
 const currentUserQuery = {
     me: {
@@ -36,9 +38,9 @@ const MyApp = () => {
     }
 
     const authorities = data?.me?.authorities || []
-    const hasAllAuthority = authorities.includes('ALL')
+    const hasAccess = authorities.includes('ALL') || authorities.includes('F_SYSTEM_SETTING')
 
-    if (!hasAllAuthority) {
+    if (!hasAccess) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', padding: '20px' }}>
                 <Card style={{ maxWidth: '600px', padding: '40px', textAlign: 'center' }}>
@@ -46,14 +48,23 @@ const MyApp = () => {
                         {i18n.t('Security Auditor')}
                     </h2>
                     <NoticeBox warning title={i18n.t('Administrator Access Required')}>
-                        {i18n.t('This tool is available for administrators only. You need the ALL authority to access the Security Auditor.')}
+                        {i18n.t(
+                            'This tool is available for administrators only. You need the {{authAll}} or {{authSystemSetting}} authority to access the Security Auditor.',
+                            { authAll: 'ALL', authSystemSetting: 'F_SYSTEM_SETTING' }
+                        )}
                     </NoticeBox>
                 </Card>
             </div>
         )
     }
 
-    return <SecurityAuditor />
+    return (
+        <AuditConfigProvider>
+            <InstanceInfoProvider>
+                <SecurityAuditor />
+            </InstanceInfoProvider>
+        </AuditConfigProvider>
+    )
 }
 
 export default MyApp

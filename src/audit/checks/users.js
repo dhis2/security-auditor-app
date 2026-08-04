@@ -1,0 +1,256 @@
+import i18n from '@dhis2/d2-i18n'
+import { checkDefaultAdminCredentials } from '../../utils/instanceInfo'
+import { fetchAllPaged } from '../../utils/pagination'
+import { passwordLastUpdatedField } from '../../utils/version'
+
+export const getUserChecks = (config) => [
+    {
+        id: 'users-never-logged-in',
+        title: i18n.t('Users Never Logged In'),
+        description: i18n.t('Checking for active accounts that have never been used'),
+        ranking: 0,
+        fetch: async (engine) => {
+            const users = await fetchAllPaged(
+                engine,
+                {
+                    resource: 'users',
+                    params: {
+                        fields: 'id,username',
+                        filter: ['disabled:eq:false', 'lastLogin:null'],
+                    },
+                },
+                config.maxAuditPages ? { maxPages: config.maxAuditPages } : undefined
+            )
+            return { users }
+        },
+        evaluate: (data) => {
+            const users = data.users
+            const total = users.length
+            const sample = users.slice(0, 5).map((u) => u.username).join(', ')
+            const more = total > 5 ? total - 5 : 0
+            return {
+                status: total > 0 ? 'warning' : 'pass',
+                message: total > 0
+                    ? i18n.t(
+                          'Found {{total}} active accounts that have never logged in',
+                          { total }
+                      )
+                    : i18n.t('All active users have logged in at least once'),
+                details: total > 0
+                    ? more > 0
+                        ? i18n.t(
+                              'Consider removing unused accounts: {{sample}} and {{more}} more',
+                              { sample, more }
+                          )
+                        : i18n.t('Consider removing unused accounts: {{sample}}', {
+                              sample,
+                          })
+                    : null,
+            }
+        },
+    },
+    {
+        id: 'users-inactive-3-months',
+        title: i18n.t('Inactive User Accounts'),
+        description: i18n.t('Checking for accounts with no recent activity'),
+        ranking: 0,
+        fetch: async (engine) => {
+            const months = config.maxInactiveMonths || 3
+            const users = await fetchAllPaged(
+                engine,
+                {
+                    resource: 'users',
+                    params: {
+                        fields: 'id,username,lastLogin',
+                        filter: 'disabled:eq:false',
+                        inactiveMonths: months,
+                    },
+                },
+                config.maxAuditPages ? { maxPages: config.maxAuditPages } : undefined
+            )
+            // The inactiveMonths parameter on some DHIS2 versions also matches
+            // users with a null lastLogin; exclude them — they're surfaced by
+            // the dedicated "users never logged in" check.
+            return { users: users.filter((u) => u.lastLogin) }
+        },
+        evaluate: (data) => {
+            const maxMonths = config.maxInactiveMonths || 3
+            const users = data.users
+            const total = users.length
+            const sample = users.slice(0, 5).map((u) => u.username).join(', ')
+            const more = total > 5 ? total - 5 : 0
+            return {
+                status: total > 0 ? 'warning' : 'pass',
+                message: total > 0
+                    ? i18n.t(
+                          "Found {{total}} users who haven't logged in for {{months}}+ months",
+                          { total, months: maxMonths }
+                      )
+                    : i18n.t(
+                          'All users with login history have recent activity (within {{months}} months)',
+                          { months: maxMonths }
+                      ),
+                details: total > 0
+                    ? more > 0
+                        ? i18n.t(
+                              'Consider disabling inactive accounts: {{sample}} and {{more}} more',
+                              { sample, more }
+                          )
+                        : i18n.t(
+                              'Consider disabling inactive accounts: {{sample}}',
+                              { sample }
+                          )
+                    : null,
+            }
+        },
+    },
+    {
+        id: 'password-age',
+        title: i18n.t('Password Age Verification'),
+        description: i18n.t('Checking for stale or unchanged passwords'),
+        ranking: 0,
+        fetch: async (engine, ctx) => {
+            const maxAgeDays = config.maxPasswordAgeDays || 365
+            const thresholdDate = new Date()
+            thresholdDate.setDate(thresholdDate.getDate() - maxAgeDays)
+            const thresholdIso = thresholdDate.toISOString().slice(0, 10)
+            const pwField = passwordLastUpdatedField(ctx.systemVersion)
+
+            const pageOpts = config.maxAuditPages
+                ? { maxPages: config.maxAuditPages }
+                : undefined
+            const [stale, neverSet] = await Promise.all([
+                fetchAllPaged(
+                    engine,
+                    {
+                        resource: 'users',
+                        params: {
+                            fields: 'id,username',
+                            filter: [
+                                'disabled:eq:false',
+                                `${pwField}:lt:${thresholdIso}`,
+                            ],
+                        },
+                    },
+                    pageOpts
+                ),
+                fetchAllPaged(
+                    engine,
+                    {
+                        resource: 'users',
+                        params: {
+                            fields: 'id,username',
+                            filter: ['disabled:eq:false', `${pwField}:null`],
+                        },
+                    },
+                    pageOpts
+                ),
+            ])
+
+            // Server-side `:lt:` excludes nulls, so we union the two result
+            // sets to include both "never set" and "older than threshold".
+            const byId = new Map()
+            for (const u of stale) {
+                byId.set(u.id, u)
+            }
+            for (const u of neverSet) {
+                byId.set(u.id, u)
+            }
+            return { users: Array.from(byId.values()) }
+        },
+        evaluate: (data) => {
+            const maxAgeDays = config.maxPasswordAgeDays || 365
+            const users = data.users
+            const total = users.length
+            const sample = users.slice(0, 5).map((u) => u.username).join(', ')
+            const more = total > 5 ? total - 5 : 0
+            return {
+                status: total > 0 ? 'warning' : 'pass',
+                message: total > 0
+                    ? i18n.t(
+                          'Found {{total}} users with passwords older than {{days}} days or never changed',
+                          { total, days: maxAgeDays }
+                      )
+                    : i18n.t(
+                          'All user passwords are up to date (within {{days}} days)',
+                          { days: maxAgeDays }
+                      ),
+                details: total > 0
+                    ? more > 0
+                        ? i18n.t(
+                              'Users with stale passwords: {{sample}} and {{more}} more',
+                              { sample, more }
+                          )
+                        : i18n.t('Users with stale passwords: {{sample}}', {
+                              sample,
+                          })
+                    : null,
+            }
+        },
+    },
+    // The legacy heuristic-based `default-admin-password` check (which
+    // compared passwordLastUpdated to created) was removed in favor of the
+    // active `default-admin-credentials-active` check below, which actually
+    // probes admin/district against the server. Removing the old check also
+    // drops its /api/users?filter=username:eq:admin database query.
+    {
+        id: 'default-admin-credentials-active',
+        title: i18n.t('Default Admin Credentials Active Check'),
+        description: i18n.t('Actively testing whether admin/district is accepted'),
+        ranking: 11,
+        fetch: async (_engine, ctx) =>
+            checkDefaultAdminCredentials(ctx.systemInfo?.contextPath),
+        evaluate: (data) => {
+            if (data.authenticated === true) {
+                return {
+                    status: 'fail',
+                    message: i18n.t(
+                        'Default admin credentials are accepted by the server'
+                    ),
+                    details: i18n.t(
+                        'The server accepted admin/district for the admin account. Change the admin password immediately. This check sends the test request without the current session cookie.'
+                    ),
+                }
+            }
+
+            if (
+                data.authenticated === false &&
+                (data.status === 401 || data.status === 403)
+            ) {
+                return {
+                    status: 'pass',
+                    message: i18n.t('Default admin credentials are not accepted'),
+                    details: i18n.t(
+                        'The active check received HTTP {{status}}, so admin/district was not accepted.',
+                        { status: data.status }
+                    ),
+                }
+            }
+
+            return {
+                status: 'warning',
+                message: i18n.t('Unable to verify default admin credentials'),
+                details: data.error
+                    ? i18n.t(
+                          'The active check could not determine whether admin/district works because {{error}}',
+                          { error: data.error }
+                      )
+                    : i18n.t(
+                          'The active check returned username {{username}} with HTTP {{status}} instead of confirming the admin account.',
+                          {
+                              username: data.username || i18n.t('unknown'),
+                              status: data.status || i18n.t('unknown'),
+                          }
+                      ),
+            }
+        },
+        onError: (error) => ({
+            status: 'warning',
+            message: i18n.t('Unable to verify default admin credentials'),
+            details: i18n.t(
+                'The active admin/district check could not be completed. Basic authentication may be disabled, blocked by SSO/proxy configuration, or unavailable in this browser. Reported error {{error}}.',
+                { error: error.message || i18n.t('Unknown error') }
+            ),
+        }),
+    },
+]

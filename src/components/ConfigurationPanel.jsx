@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
     Card,
     Button,
@@ -8,28 +8,51 @@ import {
     CircularLoader,
 } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
-import { useAuditConfig } from '../hooks/useAuditConfig'
+import { DEFAULT_CONFIG, useAuditConfig } from '../hooks/useAuditConfig'
+import {
+    REQUIRED_CONFIG_KEYS,
+    validateConfig,
+} from '../utils/configValidation'
+import { downloadBlob } from '../utils/download'
 import classes from './ConfigurationPanel.module.css'
 
 export const ConfigurationPanel = () => {
-    const {
-        config,
-        loading,
-        error,
-        updateConfigValue,
-        resetConfig,
-        saveConfig,
-    } = useAuditConfig()
+    const { config, loading, error, resetConfig, saveConfig } = useAuditConfig()
 
     const [localConfig, setLocalConfig] = useState(config)
     const [saving, setSaving] = useState(false)
     const [saveMessage, setSaveMessage] = useState(null)
     const fileInputRef = useRef(null)
+    const messageTimerRef = useRef(null)
 
     // Update local config when global config changes
-    React.useEffect(() => {
+    useEffect(() => {
         setLocalConfig(config)
     }, [config])
+
+    // Show a transient feedback message; auto-clears after `timeoutMs`. Cancels
+    // any pending clear-timer so successive calls don't blank out a newer
+    // message early. The cleanup effect below clears the timer on unmount so
+    // we don't `setState` on an unmounted component.
+    const flashMessage = useCallback((message, timeoutMs = 3000) => {
+        if (messageTimerRef.current) {
+            clearTimeout(messageTimerRef.current)
+        }
+        setSaveMessage(message)
+        messageTimerRef.current = setTimeout(() => {
+            setSaveMessage(null)
+            messageTimerRef.current = null
+        }, timeoutMs)
+    }, [])
+
+    useEffect(
+        () => () => {
+            if (messageTimerRef.current) {
+                clearTimeout(messageTimerRef.current)
+            }
+        },
+        []
+    )
 
     const handleChange = (key, value) => {
         setLocalConfig((prev) => ({ ...prev, [key]: parseInt(value, 10) }))
@@ -37,59 +60,45 @@ export const ConfigurationPanel = () => {
     }
 
     const handleSave = async () => {
-        setSaving(true)
-        setSaveMessage(null)
-
-        const result = await saveConfig(localConfig)
-
-        if (result.success) {
-            setSaveMessage({ type: 'success', text: i18n.t('Configuration saved successfully') })
-        } else {
-            setSaveMessage({ type: 'error', text: i18n.t('Failed to save configuration') })
+        const errors = validateConfig(localConfig)
+        if (errors.length > 0) {
+            flashMessage({ type: 'error', text: errors.join('. ') }, 5000)
+            return
         }
 
+        setSaving(true)
+        const result = await saveConfig(localConfig)
+        flashMessage(
+            result.success
+                ? { type: 'success', text: i18n.t('Configuration saved successfully') }
+                : { type: 'error', text: i18n.t('Failed to save configuration') }
+        )
         setSaving(false)
-
-        // Clear message after 3 seconds
-        setTimeout(() => setSaveMessage(null), 3000)
     }
 
     const handleReset = async () => {
         setSaving(true)
-        setSaveMessage(null)
-
         const result = await resetConfig()
-
-        if (result.success) {
-            setSaveMessage({ type: 'success', text: i18n.t('Configuration reset to defaults') })
-        } else {
-            setSaveMessage({ type: 'error', text: i18n.t('Failed to reset configuration') })
-        }
-
+        flashMessage(
+            result.success
+                ? { type: 'success', text: i18n.t('Configuration reset to defaults') }
+                : { type: 'error', text: i18n.t('Failed to reset configuration') }
+        )
         setSaving(false)
-
-        // Clear message after 3 seconds
-        setTimeout(() => setSaveMessage(null), 3000)
     }
 
     const handleExport = () => {
         try {
-            const configJson = JSON.stringify(config, null, 2)
-            const blob = new Blob([configJson], { type: 'application/json' })
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `security-auditor-config-${new Date().toISOString().split('T')[0]}.json`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
-
-            setSaveMessage({ type: 'success', text: i18n.t('Configuration exported successfully') })
-            setTimeout(() => setSaveMessage(null), 3000)
+            const blob = new Blob([JSON.stringify(config, null, 2)], {
+                type: 'application/json',
+            })
+            downloadBlob(
+                blob,
+                `security-auditor-config-${new Date().toISOString().split('T')[0]}.json`
+            )
+            flashMessage({ type: 'success', text: i18n.t('Configuration exported successfully') })
         } catch (err) {
-            setSaveMessage({ type: 'error', text: i18n.t('Failed to export configuration') })
-            setTimeout(() => setSaveMessage(null), 3000)
+            flashMessage({ type: 'error', text: i18n.t('Failed to export configuration') })
         }
     }
 
@@ -98,47 +107,57 @@ export const ConfigurationPanel = () => {
         if (!file) return
 
         setSaving(true)
-        setSaveMessage(null)
 
         try {
             const text = await file.text()
             const importedConfig = JSON.parse(text)
 
-            // Validate that imported config has expected structure
-            const requiredKeys = ['minPasswordLength', 'maxInactiveMonths', 'maxPasswordAgeDays', 'maxSuperUserRoles']
-            const hasAllKeys = requiredKeys.every(key => key in importedConfig)
-
-            if (!hasAllKeys) {
-                throw new Error('Invalid configuration file format')
+            if (!importedConfig || typeof importedConfig !== 'object') {
+                throw new Error(
+                    i18n.t('Imported file is not a valid configuration object')
+                )
             }
 
-            // Validate that values are numbers
-            const allNumbers = requiredKeys.every(key => typeof importedConfig[key] === 'number')
-            if (!allNumbers) {
-                throw new Error('Invalid configuration values')
+            // Sanity check: the file should contain at least one recognized key.
+            // Rejects unrelated JSON without rejecting older exports that simply
+            // pre-date a more recent config field (those are upgraded via the
+            // DEFAULT_CONFIG merge below).
+            const hasAnyKnownKey = REQUIRED_CONFIG_KEYS.some(
+                (key) => key in importedConfig
+            )
+            if (!hasAnyKnownKey) {
+                throw new Error(
+                    i18n.t('No recognized configuration fields found')
+                )
             }
 
-            const result = await saveConfig(importedConfig)
+            // Merge with defaults so missing keys (e.g. from an older export)
+            // get filled in automatically.
+            const mergedConfig = { ...DEFAULT_CONFIG, ...importedConfig }
+
+            const errors = validateConfig(mergedConfig)
+            if (errors.length > 0) {
+                throw new Error(errors.join('. '))
+            }
+
+            const result = await saveConfig(mergedConfig)
 
             if (result.success) {
-                setLocalConfig(importedConfig)
-                setSaveMessage({ type: 'success', text: i18n.t('Configuration imported successfully') })
+                setLocalConfig(mergedConfig)
+                flashMessage({ type: 'success', text: i18n.t('Configuration imported successfully') })
             } else {
-                setSaveMessage({ type: 'error', text: i18n.t('Failed to save imported configuration') })
+                flashMessage({ type: 'error', text: i18n.t('Failed to save imported configuration') })
             }
         } catch (err) {
-            setSaveMessage({
+            flashMessage({
                 type: 'error',
-                text: `${i18n.t('Failed to import configuration')}: ${err.message}`
+                text: `${i18n.t('Failed to import configuration')}: ${err.message}`,
             })
         } finally {
             setSaving(false)
-            // Clear the file input
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
             }
-            // Clear message after 3 seconds
-            setTimeout(() => setSaveMessage(null), 3000)
         }
     }
 
@@ -148,14 +167,16 @@ export const ConfigurationPanel = () => {
 
     if (loading) {
         return (
-            <Card className={classes.card}>
-                <CircularLoader />
-            </Card>
+            <div className={classes.container}>
+                <Card className={classes.card}>
+                    <CircularLoader />
+                </Card>
+            </div>
         )
     }
 
     return (
-        <>
+        <div className={classes.container}>
         <Card className={classes.card}>
             <div className={classes.header}>
                 <h3 className={classes.title}>{i18n.t('Security Audit Configuration')}</h3>
@@ -212,13 +233,41 @@ export const ConfigurationPanel = () => {
                 />
 
                 <InputField
-                    label={i18n.t('Maximum Super User Roles')}
+                    label={i18n.t('Maximum Privileged Users')}
                     type="number"
                     min="1"
                     max="50"
                     value={String(localConfig.maxSuperUserRoles)}
                     onChange={({ value }) => handleChange('maxSuperUserRoles', value)}
-                    helpText={i18n.t('Maximum number of user roles with ALL authorities before warning')}
+                    helpText={i18n.t(
+                        'Threshold for the number of users holding privileged authorities (ALL, F_PUBLIC_ROUTE_ADD, F_IMPERSONATE_USER, or F_SYSTEM_SETTING) before a warning is raised'
+                    )}
+                />
+
+                <InputField
+                    label={i18n.t('Maximum Audit Pages Per Query')}
+                    type="number"
+                    min="100"
+                    max="50000"
+                    value={String(localConfig.maxAuditPages)}
+                    onChange={({ value }) => handleChange('maxAuditPages', value)}
+                    helpText={i18n.t(
+                        'Hard cap on how many pages a single audit query will fetch. With the default page size of 200, 5000 pages allows up to 1,000,000 matched rows. Raise for very large instances; lower as a defensive limit.'
+                    )}
+                />
+
+                <InputField
+                    label={i18n.t('Apps Audit Concurrency')}
+                    type="number"
+                    min="1"
+                    max="16"
+                    value={String(localConfig.maxAppAuditConcurrency)}
+                    onChange={({ value }) =>
+                        handleChange('maxAppAuditConcurrency', value)
+                    }
+                    helpText={i18n.t(
+                        'Number of installed apps scanned in parallel by the Apps Audit. Higher values fetch faster but use more CPU during obfuscation analysis.'
+                    )}
                 />
             </div>
 
@@ -257,6 +306,6 @@ export const ConfigurationPanel = () => {
                 </Button>
             </ButtonStrip>
         </Card>
-    </>
+    </div>
     )
 }
