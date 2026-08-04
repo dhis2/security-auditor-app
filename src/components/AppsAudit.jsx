@@ -85,12 +85,22 @@ const ProgressBar = ({ current, total, currentAppKey }) => {
     )
 }
 
+// Is there anything to show if the row is expanded? Deliberately not gated on
+// status: most findings are now informational and leave the app at `pass`, so
+// gating on status would make them unreachable in the UI.
+const hasDetails = (result) =>
+    Boolean(
+        result.error ||
+            result.note ||
+            (result.files || []).some(
+                (f) => f.error || f.skipped || (f.warnings || []).length > 0
+            )
+    )
+
 const AppRow = ({ result }) => {
     const [expanded, setExpanded] = useState(false)
     const status = result.status || 'pass'
-    const expandable =
-        status !== 'pass' &&
-        ((result.files && result.files.length > 0) || result.error)
+    const expandable = hasDetails(result)
 
     const source = appSource(result.app)
     return (
@@ -128,6 +138,11 @@ const AppRow = ({ result }) => {
                                     {i18n.t('Error: {{message}}', {
                                         message: result.error,
                                     })}
+                                </div>
+                            )}
+                            {result.note && (
+                                <div className={classes.warningRow}>
+                                    {result.note}
                                 </div>
                             )}
                             {(result.files || []).map((file) => (
@@ -277,6 +292,7 @@ export const AppsAudit = ({
     // completed
     const failures = results.filter((r) => r.status === 'fail').length
     const warnings = results.filter((r) => r.status === 'warning').length
+    const notScanned = results.filter((r) => r.notScanned).length
     return (
         <div className={classes.container}>
             <div className={classes.panelWithAction}>
@@ -297,6 +313,12 @@ export const AppsAudit = ({
                               { warnings }
                           )
                         : i18n.t('All scanned apps look clean.')}
+                    {notScanned > 0 &&
+                        ' ' +
+                            i18n.t(
+                                '{{notScanned}} app(s) could not be scanned — see details.',
+                                { notScanned }
+                            )}
                 </NoticeBox>
                 <Button onClick={onStart}>
                     {i18n.t('Re-run Apps Audit')}
@@ -361,6 +383,7 @@ const buildAppsReportHtml = ({ results, systemInfo, serverHeader }) => {
     const warnings = results.filter((r) => r.status === 'warning').length
     const errors = results.filter((r) => r.status === 'error').length
     const passed = results.filter((r) => r.status === 'pass').length
+    const notScanned = results.filter((r) => r.notScanned).length
 
     const order = { fail: 0, error: 1, warning: 2, info: 3, pass: 4 }
     const sorted = [...results].sort(
@@ -388,6 +411,8 @@ const buildAppsReportHtml = ({ results, systemInfo, serverHeader }) => {
                 ? `<div class="file-error">${escapeHtml(
                       i18n.t('Error: {{message}}', { message: result.error })
                   )}</div>`
+                : result.note
+                ? `<div class="file-skipped">${escapeHtml(result.note)}</div>`
                 : (result.files || [])
                       .map((f) => formatFileFindings(f))
                       .filter(Boolean)
@@ -446,7 +471,8 @@ const buildAppsReportHtml = ({ results, systemInfo, serverHeader }) => {
         <strong>${escapeHtml(i18n.t('Failed:'))}</strong> ${failures}<br>
         <strong>${escapeHtml(i18n.t('Warnings:'))}</strong> ${warnings}<br>
         <strong>${escapeHtml(i18n.t('Errors:'))}</strong> ${errors}<br>
-        <strong>${escapeHtml(i18n.t('Passed:'))}</strong> ${passed}
+        <strong>${escapeHtml(i18n.t('Passed:'))}</strong> ${passed}<br>
+        <strong>${escapeHtml(i18n.t('Not scanned:'))}</strong> ${notScanned}
     </div>
 
     <h2>${escapeHtml(i18n.t('System Information'))}</h2>

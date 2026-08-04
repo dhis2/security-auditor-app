@@ -8,9 +8,13 @@ import {
 } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n'
+import { DEFAULT_SCAN_LIMITS } from '../audit/apps/scanLimits'
 
 // Default configuration values. Exported so the import-config flow can merge
 // older JSON exports (which may pre-date newer keys) with current defaults.
+//
+// The apps-scan bounds live in scanLimits.js next to the code they govern,
+// together with the measurement behind each default.
 export const DEFAULT_CONFIG = {
     minPasswordLength: 8,
     maxInactiveMonths: 3,
@@ -18,6 +22,7 @@ export const DEFAULT_CONFIG = {
     maxSuperUserRoles: 5,
     maxAuditPages: 5000,
     maxAppAuditConcurrency: 4,
+    ...DEFAULT_SCAN_LIMITS,
 }
 
 // DataStore namespace for the app

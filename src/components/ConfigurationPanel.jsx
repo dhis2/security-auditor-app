@@ -8,6 +8,7 @@ import {
     CircularLoader,
 } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
+import { SCAN_LIMIT_BOUNDS } from '../audit/apps/scanLimits'
 import { DEFAULT_CONFIG, useAuditConfig } from '../hooks/useAuditConfig'
 import {
     REQUIRED_CONFIG_KEYS,
@@ -267,6 +268,58 @@ export const ConfigurationPanel = () => {
                     }
                     helpText={i18n.t(
                         'Number of installed apps scanned in parallel by the Apps Audit. Higher values fetch faster but use more CPU during obfuscation analysis.'
+                    )}
+                />
+
+                <InputField
+                    label={i18n.t('Maximum Files Scanned Per App')}
+                    type="number"
+                    min={String(SCAN_LIMIT_BOUNDS.maxAppFilesScanned.min)}
+                    max={String(SCAN_LIMIT_BOUNDS.maxAppFilesScanned.max)}
+                    value={String(localConfig.maxAppFilesScanned)}
+                    onChange={({ value }) =>
+                        handleChange('maxAppFilesScanned', value)
+                    }
+                    helpText={i18n.t(
+                        'The Apps Audit follows an app’s module graph (entry scripts, modulepreloads and lazy-loaded chunks). This bounds how many files one app may contribute. DHIS2 2.43 apps use 2-5. Anything skipped because of this limit is listed in the findings.'
+                    )}
+                />
+
+                <InputField
+                    label={i18n.t('Maximum MB Scanned Per App')}
+                    type="number"
+                    min={String(SCAN_LIMIT_BOUNDS.maxAppScanMb.min)}
+                    max={String(SCAN_LIMIT_BOUNDS.maxAppScanMb.max)}
+                    value={String(localConfig.maxAppScanMb)}
+                    onChange={({ value }) => handleChange('maxAppScanMb', value)}
+                    helpText={i18n.t(
+                        'Total JavaScript analyzed for a single app. DHIS2 2.43 apps total 1.3-7.2 MB.'
+                    )}
+                />
+
+                <InputField
+                    label={i18n.t('Maximum MB Per App File')}
+                    type="number"
+                    min={String(SCAN_LIMIT_BOUNDS.maxAppFileMb.min)}
+                    max={String(SCAN_LIMIT_BOUNDS.maxAppFileMb.max)}
+                    value={String(localConfig.maxAppFileMb)}
+                    onChange={({ value }) => handleChange('maxAppFileMb', value)}
+                    helpText={i18n.t(
+                        'Largest single file the analyzer will parse. Parsing runs on this browser tab’s main thread, so a very large chunk stalls the UI. Raising this above 5 also runs into the analyzer failing outright on the largest DHIS2 bundle.'
+                    )}
+                />
+
+                <InputField
+                    label={i18n.t('Minimum Encoded Literal Length')}
+                    type="number"
+                    min={String(SCAN_LIMIT_BOUNDS.minEncodedLiteralLength.min)}
+                    max={String(SCAN_LIMIT_BOUNDS.minEncodedLiteralLength.max)}
+                    value={String(localConfig.minEncodedLiteralLength)}
+                    onChange={({ value }) =>
+                        handleChange('minEncodedLiteralLength', value)
+                    }
+                    helpText={i18n.t(
+                        'Encoded-literal findings shorter than this are not reported. The analyzer scores short ordinary strings — i18n event names, DHIS2 error codes like "E7113" — as candidate base64. Set to 0 to report every one.'
                     )}
                 />
             </div>

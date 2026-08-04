@@ -33,10 +33,10 @@ describe('runAppsAudit', () => {
             },
         ])
         const fetchText = makeFetchText({
-            'https://server/dhis/api/apps/app-one/index.html':
+            'https://server/dhis/api/apps/app-one/index.html?redirect=false':
                 '<script src="main.js"></script>',
             'https://server/dhis/api/apps/app-one/main.js': 'console.log(1)',
-            'https://server/dhis/api/apps/app-two/index.html':
+            'https://server/dhis/api/apps/app-two/index.html?redirect=false':
                 '<script src="main.js"></script>',
             'https://server/dhis/api/apps/app-two/main.js': 'console.log(2)',
         })
@@ -81,7 +81,7 @@ describe('runAppsAudit', () => {
             { key: 'evil', baseUrl: 'https://server/dhis/api/apps/evil' },
         ])
         const fetchText = makeFetchText({
-            'https://server/dhis/api/apps/evil/index.html':
+            'https://server/dhis/api/apps/evil/index.html?redirect=false':
                 '<script src="main.js"></script>',
             'https://server/dhis/api/apps/evil/main.js': 'eval("...")',
         })
@@ -104,7 +104,7 @@ describe('runAppsAudit', () => {
             { key: 'ok', baseUrl: 'https://server/dhis/api/apps/ok' },
         ])
         const fetchText = async (url) => {
-            if (url === 'https://server/dhis/api/apps/broken/index.html') {
+            if (url === 'https://server/dhis/api/apps/broken/index.html?redirect=false') {
                 throw new Error('Network down')
             }
             return { text: '<html></html>', finalUrl: url }
@@ -117,7 +117,11 @@ describe('runAppsAudit', () => {
         const broken = results.find((r) => r.app.key === 'broken')
         const ok = results.find((r) => r.app.key === 'ok')
         expect(broken.error).toMatch(/Network down/)
-        expect(ok.status).toBe('pass')
+        expect(broken.status).toBe('error')
+        // No <script src> in the stub index — reported as unscanned (info),
+        // not as a clean pass.
+        expect(ok.status).toBe('info')
+        expect(ok.notScanned).toBe('no-entries')
     })
 
     it('emits the expected lifecycle callbacks', async () => {
@@ -126,7 +130,7 @@ describe('runAppsAudit', () => {
             { key: 'a', baseUrl: 'https://server/dhis/api/apps/a' },
         ])
         const fetchText = makeFetchText({
-            'https://server/dhis/api/apps/a/index.html': '<html></html>',
+            'https://server/dhis/api/apps/a/index.html?redirect=false': '<html></html>',
         })
         await runAppsAudit(
             engine,
@@ -145,7 +149,7 @@ describe('runAppsAudit', () => {
         expect(events).toEqual([
             'startRun:1',
             'appStart:a',
-            'appDone:a=pass',
+            'appDone:a=info',
             'progress:1/1',
             'complete',
         ])
@@ -167,7 +171,7 @@ describe('runAppsAudit', () => {
         const requested = []
         const fetchText = async (url) => {
             requested.push(url)
-            if (url === 'https://server/dhis-web-core-app/index.html') {
+            if (url === 'https://server/dhis-web-core-app/index.html?redirect=false') {
                 return {
                     text: '<script src="/assets/main-DH0lLmwl.js"></script>',
                     finalUrl: url,
@@ -209,7 +213,239 @@ describe('runAppsAudit', () => {
             fetchText,
             contextPath: '/dhis',
         })
-        expect(requested).toContain('/dhis/api/apps/no-base/index.html')
+        expect(requested).toContain('/dhis/api/apps/no-base/index.html?redirect=false')
+    })
+
+    it('requests index.html with the global-shell bypass', async () => {
+        // Regression: on DHIS2 2.42+, /api/apps/<key>/index.html answers
+        // 302 -> /apps/<key>, which serves the *global shell's* index.html.
+        // Every app then resolved to the same shell bundle, so all 45 apps on
+        // an instance produced byte-identical findings drawn from the shell's
+        // vendor code. ?redirect=false serves the app's own index.html.
+        const engine = makeEngine([
+            { key: 'dashboard', baseUrl: 'https://server/api/apps/dashboard' },
+        ])
+        const requested = []
+        const fetchText = async (url) => {
+            requested.push(url)
+            return { text: '<html></html>', finalUrl: url }
+        }
+        await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            fetchText,
+        })
+        expect(requested[0]).toBe(
+            'https://server/api/apps/dashboard/index.html?redirect=false'
+        )
+    })
+
+    it('refuses to analyze a document the server redirected us to', async () => {
+        // Belt and braces for instances that redirect regardless of the
+        // bypass parameter: if the final URL leaves the app's directory we
+        // are looking at the shell (or a login page), not the app. Analyzing
+        // it would attribute the shell's code to this app.
+        const engine = makeEngine([
+            { key: 'dashboard', baseUrl: 'https://server/api/apps/dashboard' },
+        ])
+        const fetchText = async (url) => {
+            if (url.startsWith('https://server/api/apps/dashboard/index.html')) {
+                return {
+                    text: '<script src="./assets/shell.js"></script>',
+                    finalUrl: 'https://server/apps/dashboard',
+                }
+            }
+            return { text: 'console.log(1)', finalUrl: url }
+        }
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            fetchText,
+        })
+        expect(result.notScanned).toBe('shell-redirect')
+        expect(result.files).toEqual([])
+        expect(result.status).toBe('info')
+        expect(result.note).toMatch(/app shell was served/)
+    })
+
+    it('scans normally on pre-2.42 instances, which ignore the bypass', async () => {
+        // Verified against the public play instances: on 2.40.12 and 2.41.9
+        // the app's index.html answers 200 directly and ?redirect=false is an
+        // unknown parameter that the server ignores. /api/apps reports the
+        // legacy /dhis-web-<name> path as baseUrl on those versions, so that
+        // is the shape exercised here. The redirect guard must not fire.
+        const engine = makeEngine([
+            {
+                key: 'dashboard',
+                baseUrl: 'https://server/dhis-web-dashboard',
+            },
+        ])
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            fetchText: makeFetchText({
+                'https://server/dhis-web-dashboard/index.html?redirect=false':
+                    '<script src="./assets/main-JWFjH4Vq.js"></script>',
+                'https://server/dhis-web-dashboard/assets/main-JWFjH4Vq.js':
+                    'console.log(1)',
+            }),
+        })
+        expect(result.notScanned).toBeUndefined()
+        expect(result.status).toBe('pass')
+        expect(result.files).toHaveLength(1)
+    })
+
+    it('names an expired session rather than blaming the app shell', async () => {
+        // A session expiring mid-run redirects every remaining app to the
+        // login page. Reporting that as a shell redirect would send an admin
+        // looking in the wrong place.
+        const engine = makeEngine([
+            { key: 'dashboard', baseUrl: 'https://server/dhis-web-dashboard' },
+        ])
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            fetchText: async () => ({
+                text: '<script src="./assets/login.js"></script>',
+                finalUrl: 'https://server/dhis-web-login/',
+            }),
+        })
+        expect(result.notScanned).toBe('login-redirect')
+        expect(result.note).toMatch(/session has probably expired/)
+    })
+
+    it('follows modulepreload links and lazy-chunk imports', async () => {
+        // Vite splits an app across chunks. On several DHIS2 apps the entry
+        // is a ~1 KB stub and the real 600 KB bundle is reachable only via
+        // <link rel="modulepreload"> or an import specifier inside the JS.
+        const engine = makeEngine([
+            { key: 'maps', baseUrl: 'https://server/api/apps/maps' },
+        ])
+        const files = {
+            'https://server/api/apps/maps/index.html?redirect=false':
+                '<script src="./assets/main.js"></script>' +
+                '<link rel="modulepreload" href="./assets/index-abc.js">',
+            'https://server/api/apps/maps/assets/main.js':
+                'import"./index-abc.js";const d=["./AppWrapper-xyz.js"];',
+            'https://server/api/apps/maps/assets/index-abc.js': 'export const a=1',
+            'https://server/api/apps/maps/assets/AppWrapper-xyz.js': 'export const b=2',
+        }
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            fetchText: makeFetchText(files),
+        })
+        expect(result.status).toBe('pass')
+        // Entry + modulepreload + the lazy chunk named in the deps array.
+        expect(result.files.map((f) => f.src).sort()).toEqual([
+            './AppWrapper-xyz.js',
+            './assets/index-abc.js',
+            './assets/main.js',
+        ])
+    })
+
+    it('does not blame the app for an unfetchable discovered specifier', async () => {
+        // The crawler finds specifiers by scanning string literals, so it can
+        // pick up something that only looks like a module path. That must
+        // cost one 404, not an error finding against the app.
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            fetchText: makeFetchText({
+                'https://server/api/apps/a/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/api/apps/a/main.js': 'const s="./not-real.js"',
+            }),
+        })
+        expect(result.status).toBe('pass')
+        const ghost = result.files.find((f) => f.src === './not-real.js')
+        expect(ghost.error).toBeUndefined()
+        expect(ghost.skipped).toBeTruthy()
+    })
+
+    it('skips a path that answers with HTML instead of JavaScript', async () => {
+        // Regression: DHIS2 answers a missing app path with an HTML page, not
+        // a 404. Handing that to the analyzer raised "Unexpected token '<'"
+        // and marked the whole app as errored.
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            fetchText: makeFetchText({
+                'https://server/api/apps/a/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/api/apps/a/main.js':
+                    'const p="./vendor/jquery-3.3.1.min.js"',
+                'https://server/api/apps/a/vendor/jquery-3.3.1.min.js':
+                    '<!DOCTYPE html><html><body>Not found</body></html>',
+            }),
+        })
+        expect(result.status).toBe('pass')
+        const vendor = result.files.find((f) => f.src.includes('jquery'))
+        expect(vendor.error).toBeUndefined()
+        expect(vendor.skipped).toMatch(/did not return JavaScript/)
+    })
+
+    it('does not fail an app for vendor globalThis shims or minification', async () => {
+        // The finding set every DHIS2 bundle produces: lodash's
+        // Function("return this"), i18next's "added" event name, and the
+        // minifier's short identifiers. None of it should fail an app.
+        const engine = makeEngine([
+            { key: 'normal', baseUrl: 'https://server/api/apps/normal' },
+        ])
+        const source = 'var g=typeof self=="object"?self:Function("return this")();'
+        const vendorAnalyze = () => ({
+            warnings: [
+                {
+                    kind: 'unsafe-stmt',
+                    value: 'Function',
+                    location: [1, source.indexOf('Function')],
+                },
+                { kind: 'encoded-literal', value: 'added' },
+                { kind: 'short-identifiers', value: 1.39 },
+            ],
+        })
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: vendorAnalyze,
+            fetchText: makeFetchText({
+                'https://server/api/apps/normal/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/api/apps/normal/main.js': source,
+            }),
+        })
+        // Clean verdict — the surviving finding is still listed for a human,
+        // but informational kinds never bump the status.
+        expect(result.status).toBe('pass')
+        // The two attributable vendor patterns are suppressed outright.
+        expect(result.files[0].warnings.map((w) => w.kind)).toEqual([
+            'short-identifiers',
+        ])
+    })
+
+    it('applies the configured scan limits and reports what they skipped', async () => {
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const [result] = await runAppsAudit(
+            engine,
+            { ...TEST_CONFIG, maxAppFilesScanned: 2, maxAppFileMb: 1 },
+            {},
+            {
+                analyze: cleanAnalyze,
+                fetchText: makeFetchText({
+                    'https://server/api/apps/a/index.html?redirect=false':
+                        '<script src="./main.js"></script>',
+                    'https://server/api/apps/a/main.js':
+                        'import"./b.js";import"./c.js";import"./d.js"',
+                    'https://server/api/apps/a/b.js': 'x'.repeat(2 * 1024 * 1024),
+                    'https://server/api/apps/a/c.js': 'const c=1',
+                    'https://server/api/apps/a/d.js': 'const d=1',
+                }),
+            }
+        )
+        // Two files scanned, then the cap; the remainder is reported rather
+        // than dropped silently.
+        expect(result.files).toHaveLength(3)
+        expect(result.files[1].skipped).toMatch(/exceeds size limit/)
+        expect(result.files[2].skipped).toMatch(/crawl limit reached/)
     })
 
     it('handles a /api/apps fetch failure without throwing', async () => {

@@ -1,4 +1,4 @@
-import { findScripts } from './findScripts'
+import { findScripts, findModulePreloads, findEntryAssets } from './findScripts'
 
 describe('findScripts', () => {
     it('returns an empty array for missing or non-string input', () => {
@@ -45,5 +45,51 @@ describe('findScripts', () => {
             <script src="main.js"></script>
         `
         expect(findScripts(html)).toEqual(['main.js'])
+    })
+})
+
+describe('findModulePreloads', () => {
+    it('returns modulepreload hrefs', () => {
+        const html = `
+            <link rel="modulepreload" crossorigin href="./assets/index-DJAhnldu.js">
+            <link rel="stylesheet" href="./assets/index.css">
+            <link rel="icon" href="./favicon.ico">
+        `
+        expect(findModulePreloads(html)).toEqual(['./assets/index-DJAhnldu.js'])
+    })
+
+    it('matches rel as a token list, not an exact value', () => {
+        const html = `<link rel="preload modulepreload" href="./a.js">`
+        expect(findModulePreloads(html)).toEqual(['./a.js'])
+    })
+
+    it('applies the same cross-origin filter as scripts', () => {
+        const html = `
+            <link rel="modulepreload" href="https://cdn.example.com/a.js">
+            <link rel="modulepreload" href="./b.js">
+        `
+        expect(findModulePreloads(html)).toEqual(['./b.js'])
+    })
+})
+
+describe('findEntryAssets', () => {
+    it('combines scripts and modulepreloads without duplicates', () => {
+        // Shape emitted by Vite for the DHIS2 maps app: a ~1 KB entry stub
+        // plus modulepreloads for the chunks holding the actual app code.
+        const html = `
+            <script type="module" crossorigin src="./assets/main-HBJjIm4U.js"></script>
+            <link rel="modulepreload" crossorigin href="./assets/maps-gl-Do0JlnDk.js">
+            <link rel="modulepreload" crossorigin href="./assets/index-DJAhnldu.js">
+            <link rel="modulepreload" crossorigin href="./assets/main-HBJjIm4U.js">
+        `
+        expect(findEntryAssets(html)).toEqual([
+            './assets/main-HBJjIm4U.js',
+            './assets/maps-gl-Do0JlnDk.js',
+            './assets/index-DJAhnldu.js',
+        ])
+    })
+
+    it('returns an empty array for missing input', () => {
+        expect(findEntryAssets()).toEqual([])
     })
 })

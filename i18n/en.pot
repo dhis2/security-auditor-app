@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-05-09T06:08:35.857Z\n"
-"PO-Revision-Date: 2026-05-09T06:08:35.857Z\n"
+"POT-Creation-Date: 2026-08-04T21:05:55.820Z\n"
+"PO-Revision-Date: 2026-08-04T21:05:55.820Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -27,11 +27,34 @@ msgstr ""
 "This tool is available for administrators only. You need the {{authAll}} or "
 "{{authSystemSetting}} authority to access the Security Auditor."
 
-msgid "No <script src> entries found in index.html"
-msgstr "No <script src> entries found in index.html"
+msgid ""
+"index.html redirected to the login page ({{url}}) — the session has "
+"probably expired, so nothing was analyzed. Sign in again and re-run."
+msgstr ""
+"index.html redirected to the login page ({{url}}) — the session has "
+"probably expired, so nothing was analyzed. Sign in again and re-run."
+
+msgid ""
+"index.html redirected to {{url}} — the DHIS2 app shell was served instead "
+"of the app, so the app’s own code could not be located."
+msgstr ""
+"index.html redirected to {{url}} — the DHIS2 app shell was served instead "
+"of the app, so the app’s own code could not be located."
+
+msgid "No JavaScript entry points found in index.html"
+msgstr "No JavaScript entry points found in index.html"
+
+msgid "crawl limit reached"
+msgstr "crawl limit reached"
+
+msgid "not fetchable"
+msgstr "not fetchable"
 
 msgid "file exceeds size limit"
 msgstr "file exceeds size limit"
+
+msgid "server did not return JavaScript"
+msgstr "server did not return JavaScript"
 
 msgid "Installed App Sources"
 msgstr "Installed App Sources"
@@ -638,6 +661,9 @@ msgstr "Apps Audit completed with {{warnings}} warning(s). Review recommended."
 msgid "All scanned apps look clean."
 msgstr "All scanned apps look clean."
 
+msgid "{{notScanned}} app(s) could not be scanned — see details."
+msgstr "{{notScanned}} app(s) could not be scanned — see details."
+
 msgid "Failed to generate report"
 msgstr "Failed to generate report"
 
@@ -816,6 +842,54 @@ msgstr ""
 "Number of installed apps scanned in parallel by the Apps Audit. Higher "
 "values fetch faster but use more CPU during obfuscation analysis."
 
+msgid "Maximum Files Scanned Per App"
+msgstr "Maximum Files Scanned Per App"
+
+msgid ""
+"The Apps Audit follows an app’s module graph (entry scripts, modulepreloads "
+"and lazy-loaded chunks). This bounds how many files one app may contribute. "
+"DHIS2 2.43 apps use 2-5. Anything skipped because of this limit is listed "
+"in the findings."
+msgstr ""
+"The Apps Audit follows an app’s module graph (entry scripts, modulepreloads "
+"and lazy-loaded chunks). This bounds how many files one app may contribute. "
+"DHIS2 2.43 apps use 2-5. Anything skipped because of this limit is listed "
+"in the findings."
+
+msgid "Maximum MB Scanned Per App"
+msgstr "Maximum MB Scanned Per App"
+
+msgid ""
+"Total JavaScript analyzed for a single app. DHIS2 2.43 apps total 1.3-7.2 "
+"MB."
+msgstr ""
+"Total JavaScript analyzed for a single app. DHIS2 2.43 apps total 1.3-7.2 "
+"MB."
+
+msgid "Maximum MB Per App File"
+msgstr "Maximum MB Per App File"
+
+msgid ""
+"Largest single file the analyzer will parse. Parsing runs on this browser "
+"tab’s main thread, so a very large chunk stalls the UI. Raising this above "
+"5 also runs into the analyzer failing outright on the largest DHIS2 bundle."
+msgstr ""
+"Largest single file the analyzer will parse. Parsing runs on this browser "
+"tab’s main thread, so a very large chunk stalls the UI. Raising this above "
+"5 also runs into the analyzer failing outright on the largest DHIS2 bundle."
+
+msgid "Minimum Encoded Literal Length"
+msgstr "Minimum Encoded Literal Length"
+
+msgid ""
+"Encoded-literal findings shorter than this are not reported. The analyzer "
+"scores short ordinary strings — i18n event names, DHIS2 error codes like "
+"\"E7113\" — as candidate base64. Set to 0 to report every one."
+msgstr ""
+"Encoded-literal findings shorter than this are not reported. The analyzer "
+"scores short ordinary strings — i18n event names, DHIS2 error codes like "
+"\"E7113\" — as candidate base64. Set to 0 to report every one."
+
 msgid "Saving..."
 msgstr "Saving..."
 
@@ -894,6 +968,18 @@ msgstr "Maximum audit pages per query"
 
 msgid "Apps audit concurrency"
 msgstr "Apps audit concurrency"
+
+msgid "Maximum files scanned per app"
+msgstr "Maximum files scanned per app"
+
+msgid "Maximum MB scanned per app"
+msgstr "Maximum MB scanned per app"
+
+msgid "Maximum MB per app file"
+msgstr "Maximum MB per app file"
+
+msgid "Minimum encoded literal length reported"
+msgstr "Minimum encoded literal length reported"
 
 msgid "Configuration must be an object"
 msgstr "Configuration must be an object"

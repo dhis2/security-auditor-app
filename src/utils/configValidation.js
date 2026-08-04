@@ -1,4 +1,5 @@
 import i18n from '@dhis2/d2-i18n'
+import { SCAN_LIMIT_BOUNDS } from '../audit/apps/scanLimits'
 
 // Bounds for each numeric config field. The same constraints are applied
 // when saving from the UI (handles NaN from cleared inputs) and when
@@ -38,6 +39,22 @@ const RULES = {
         getLabel: () => i18n.t('Apps audit concurrency'),
         min: 1,
         max: 16,
+    },
+    maxAppFilesScanned: {
+        getLabel: () => i18n.t('Maximum files scanned per app'),
+        ...SCAN_LIMIT_BOUNDS.maxAppFilesScanned,
+    },
+    maxAppScanMb: {
+        getLabel: () => i18n.t('Maximum MB scanned per app'),
+        ...SCAN_LIMIT_BOUNDS.maxAppScanMb,
+    },
+    maxAppFileMb: {
+        getLabel: () => i18n.t('Maximum MB per app file'),
+        ...SCAN_LIMIT_BOUNDS.maxAppFileMb,
+    },
+    minEncodedLiteralLength: {
+        getLabel: () => i18n.t('Minimum encoded literal length reported'),
+        ...SCAN_LIMIT_BOUNDS.minEncodedLiteralLength,
     },
 }
 

@@ -1,5 +1,5 @@
 import { getAnalyzer } from '../../utils/jsXRay'
-import { appStatus } from './classifyFindings'
+import { resultStatus } from './classifyFindings'
 import { fetchInstalledApps } from './fetchInstalledApps'
 import { scanApp } from './scanApp'
 
@@ -58,8 +58,9 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
                     analyze,
                     fetchText: options.fetchText,
                     contextPath: options.contextPath,
+                    config,
                 })
-                const enriched = { ...result, status: appStatus(result.files) }
+                const enriched = { ...result, status: resultStatus(result) }
                 callbacks.onAppDone?.(app, enriched)
                 completed += 1
                 callbacks.onProgress?.({
