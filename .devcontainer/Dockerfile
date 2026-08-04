@@ -1,4 +1,4 @@
-FROM ubuntu:24.04 AS devcontainer-ubuntu
+FROM ubuntu:26.04 AS devcontainer-ubuntu
 
 ARG TZ
 ENV TZ="$TZ"
