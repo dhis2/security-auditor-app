@@ -9,6 +9,8 @@ on:
 jobs:
   sbom:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -21,13 +23,20 @@ jobs:
       # directly, so no `yarn install` is needed and the SBOM carries the exact
       # pinned versions plus a full dependency graph.
       - name: Generate CycloneDX SBOM
-        run: npx --yes @cyclonedx/cdxgen@11 -t js -o bom.json --no-recurse .
+        run: npx --yes @cyclonedx/cdxgen@11.11.0 -t js -o bom.json --no-recurse .
 
       - name: Upload SBOM to DependencyTrack
         env:
-          DEPENDENCY_TRACK_API: "${{ vars.DEPENDENCY_TRACK_URL }}/api/v1/bom"
+          # DEPENDENCYTRACK_URL already includes the full /api/v1/bom path.
+          # Resolved from either context, since it may be stored as a repo
+          # variable or as a secret.
+          DEPENDENCY_TRACK_API: ${{ vars.DEPENDENCYTRACK_URL || secrets.DEPENDENCYTRACK_URL }}
           DT_API_KEY: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
         run: |
+          if [ -z "$DEPENDENCY_TRACK_API" ]; then
+            echo "::error::DEPENDENCYTRACK_URL is not set as a repo variable or secret"
+            exit 1
+          fi
           curl -X POST "$DEPENDENCY_TRACK_API" \
               --fail-with-body \
               -H "X-Api-Key: $DT_API_KEY" \
