@@ -43,7 +43,15 @@ jobs:
       - name: Determine bump type
         id: bump
         run: |
-          if ${{ contains(github.event.pull_request.labels.*.name, 'major') }}; then
+          # Dependabot labels a PR with the DEPENDENCY's semver change, not the
+          # app's -- a React 18 -> 19 bump arrives labelled `major` and would
+          # otherwise release v2.0.0 of this app. Dependency updates are never
+          # a breaking change to the app's own public surface, so they always
+          # release as a patch. Deliberate minor/major releases come from
+          # hand-labelled PRs, which do not carry the `dependencies` label.
+          if ${{ contains(github.event.pull_request.labels.*.name, 'dependencies') }}; then
+            echo "type=patch" >> $GITHUB_OUTPUT
+          elif ${{ contains(github.event.pull_request.labels.*.name, 'major') }}; then
             echo "type=major" >> $GITHUB_OUTPUT
           elif ${{ contains(github.event.pull_request.labels.*.name, 'minor') }}; then
             echo "type=minor" >> $GITHUB_OUTPUT
