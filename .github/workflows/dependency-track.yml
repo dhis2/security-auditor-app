@@ -27,17 +27,18 @@ jobs:
 
       - name: Upload SBOM to DependencyTrack
         env:
-          # DEPENDENCYTRACK_URL already includes the full /api/v1/bom path.
-          # Resolved from either context, since it may be stored as a repo
-          # variable or as a secret.
-          DEPENDENCY_TRACK_API: ${{ vars.DEPENDENCYTRACK_URL || secrets.DEPENDENCYTRACK_URL }}
+          DT_API_URL: ${{ vars.DEPENDENCYTRACK_URL }}
           DT_API_KEY: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
         run: |
-          if [ -z "$DEPENDENCY_TRACK_API" ]; then
-            echo "::error::DEPENDENCYTRACK_URL is not set as a repo variable or secret"
+          if [ -z "$DT_API_URL" ]; then
+            echo "::error::DEPENDENCYTRACK_URL repo variable is not set"
             exit 1
           fi
-          curl -X POST "$DEPENDENCY_TRACK_API" \
+          if [ -z "$DT_API_KEY" ]; then
+            echo "::error::DEPENDENCYTRACK_APIKEY secret is not set"
+            exit 1
+          fi
+          curl -X POST "$DT_API_URL" \
               --fail-with-body \
               -H "X-Api-Key: $DT_API_KEY" \
               -F "autoCreate=true" \
