@@ -72,6 +72,12 @@ jobs:
       - name: Build
         run: yarn build
 
+      # Runs before the tag and release are published, so a failing test
+      # aborts the release instead of shipping a broken bundle. Must run
+      # after Build -- see the note in build.yml.
+      - name: Test
+        run: yarn test
+
       - name: Commit and tag
         uses: planetscale/ghcommit-action@v0.2.0
         with:
