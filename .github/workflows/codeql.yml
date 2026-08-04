@@ -1,0 +1,38 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, so advisories published after a PR merges still get caught.
+    - cron: '0 3 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze JavaScript
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to upload results to the Security tab.
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          # This app parses and inspects untrusted DHIS2 app bundles, so the
+          # extended query set is worth the extra noise over the default.
+          queries: security-extended
+
+      # No build step: CodeQL analyses JavaScript directly from source, and
+      # `yarn build` would only add the generated app shell under .d2/.
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:javascript-typescript'

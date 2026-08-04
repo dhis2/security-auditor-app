@@ -8,6 +8,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Without this the job inherits the repository default, which is write.
+    # Building and testing only ever needs to read the checkout.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
