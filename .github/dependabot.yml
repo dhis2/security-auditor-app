@@ -1,0 +1,38 @@
+version: 2
+
+updates:
+    # GitHub Actions used by build.yml, release.yml and sbom.yml
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+          interval: weekly
+      groups:
+          actions:
+              patterns: ['*']
+
+    # Application dependencies (yarn.lock)
+    - package-ecosystem: npm
+      directory: /
+      schedule:
+          interval: weekly
+      open-pull-requests-limit: 5
+      groups:
+          dhis2:
+              patterns: ['@dhis2/*']
+          dev-dependencies:
+              dependency-type: development
+          production-dependencies:
+              dependency-type: production
+              exclude-patterns: ['@dhis2/*']
+
+    # Dev container Features (node, git, npm-package)
+    - package-ecosystem: devcontainers
+      directory: /
+      schedule:
+          interval: monthly
+
+    # Base image of the dev container (ubuntu:24.04)
+    - package-ecosystem: docker
+      directory: /.devcontainer
+      schedule:
+          interval: monthly

@@ -1,0 +1,44 @@
+name: SBOM
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # cdxgen is the CycloneDX project's own generator. It reads yarn.lock
+      # directly, so no `yarn install` is needed and the SBOM carries the exact
+      # pinned versions plus a full dependency graph.
+      - name: Generate CycloneDX SBOM
+        run: npx --yes @cyclonedx/cdxgen@11 -t js -o bom.json --no-recurse .
+
+      - name: Upload SBOM to DependencyTrack
+        env:
+          DEPENDENCY_TRACK_API: "${{ vars.DEPENDENCY_TRACK_URL }}/api/v1/bom"
+          DT_API_KEY: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
+        run: |
+          curl -X POST "$DEPENDENCY_TRACK_API" \
+              --fail-with-body \
+              -H "X-Api-Key: $DT_API_KEY" \
+              -F "autoCreate=true" \
+              -F "projectName=${{ github.event.repository.name }}" \
+              -F "projectVersion=${{ github.ref_name }}" \
+              -F "bom=@bom.json"
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: bom.json
+          retention-days: 30
