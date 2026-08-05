@@ -4,6 +4,17 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  # Commits pushed straight to main never close a pull request, so they would
+  # otherwise never be released -- the app changes in 8df2ba1 sat unreleased
+  # for exactly this reason. This allows cutting a release from main on demand.
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump'
+        required: true
+        default: patch
+        type: choice
+        options: [patch, minor, major]
 
 # Releases mutate main (version bump + tag), so they must never run in
 # parallel. Without this, merging several PRs in quick succession makes every
@@ -19,7 +30,12 @@ concurrency:
 
 jobs:
   release:
-    if: github.event.pull_request.merged == true && (contains(github.event.pull_request.labels.*.name, 'patch') || contains(github.event.pull_request.labels.*.name, 'minor') || contains(github.event.pull_request.labels.*.name, 'major'))
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       (contains(github.event.pull_request.labels.*.name, 'patch') ||
+        contains(github.event.pull_request.labels.*.name, 'minor') ||
+        contains(github.event.pull_request.labels.*.name, 'major')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -49,7 +65,9 @@ jobs:
           # a breaking change to the app's own public surface, so they always
           # release as a patch. Deliberate minor/major releases come from
           # hand-labelled PRs, which do not carry the `dependencies` label.
-          if ${{ contains(github.event.pull_request.labels.*.name, 'dependencies') }}; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ inputs.bump }}" >> $GITHUB_OUTPUT
+          elif ${{ contains(github.event.pull_request.labels.*.name, 'dependencies') }}; then
             echo "type=patch" >> $GITHUB_OUTPUT
           elif ${{ contains(github.event.pull_request.labels.*.name, 'major') }}; then
             echo "type=major" >> $GITHUB_OUTPUT
