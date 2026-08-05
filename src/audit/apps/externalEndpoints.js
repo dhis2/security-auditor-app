@@ -1,3 +1,5 @@
+import { findDecodedUrls } from './decodeLiterals'
+
 // Which outside origins does an installed app's code reference, and can it
 // actually talk to them?
 //
@@ -127,15 +129,75 @@ const QUOTES = new Set(['"', "'", '`'])
 const beginsLiteral = (source, index) =>
     index > 0 && QUOTES.has(source[index - 1])
 
+// The same question answered from the AST instead of one character of
+// context, and answered from the literal's own text rather than from byte
+// offsets.
+//
+// Offsets cannot be used here: the AST is parsed from the file as written,
+// while URLs are matched against a normalized copy in which escape sequences
+// have been decoded and split-up literals folded. Those two texts have
+// different lengths, so an index into one means nothing in the other. Values
+// are stable across both — a parser decodes \u002f to / exactly as the
+// normalizer does — so the decision is made on values.
+//
+// A host is an address if some string literal in the file *starts* with a URL
+// naming it. A host appearing only part-way through a literal is prose.
+const addressHostsFrom = (ast) => {
+    const hosts = new Set()
+    for (const literal of ast.literals) {
+        const re = new RegExp(URL_LIKE.source, 'i')
+        const match = re.exec(literal.value)
+        if (!match || match.index !== 0) {
+            continue
+        }
+        const rest = match[2] || ''
+        const end = rest.search(AUTHORITY_END)
+        const host = normalizeHost(end === -1 ? rest : rest.slice(0, end))
+        if (host && isHostLike(host)) {
+            hosts.add(host)
+        }
+    }
+    return hosts
+}
+
+// Hosts appearing in an already-decoded payload.
+const hostsIn = (text) => {
+    const out = new Set()
+    const re = new RegExp(URL_LIKE.source, 'gi')
+    let match
+    while ((match = re.exec(text)) !== null) {
+        const rest = match[2] || ''
+        const end = rest.search(AUTHORITY_END)
+        const host = normalizeHost(end === -1 ? rest : rest.slice(0, end))
+        if (host && isHostLike(host)) {
+            out.add(host)
+        }
+    }
+    return [...out]
+}
+
 // A host worth reporting: dotted name with a plausible TLD, an IPv4 literal,
 // or a bracketed IPv6 literal. Requiring the TLD shape is what keeps ordinary
 // prose ("see //foo for details") and version strings out of the results.
 const DOTTED_NAME = /^(?:[a-z0-9_-]+\.)+[a-z]{2,63}$/
+
+// Names reserved by RFC 2606 and RFC 6761 as guaranteed never to resolve.
+// They exist precisely so code can use them as placeholders, and libraries do:
+// query-string parses relative URLs against `https://query-string.invalid`,
+// because a base is required and no request must ever be made. A name that
+// cannot resolve is not a destination, so reporting one is always a false
+// positive.
+const RESERVED_TLD = /\.(?:invalid|test|example|localhost)$/
+const RESERVED_NAME = /^(?:www\.)?example\.(?:com|net|org)$/
+
+const isReservedName = (host) =>
+    RESERVED_TLD.test(host) || RESERVED_NAME.test(host)
 const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/
 const IPV6 = /^\[[0-9a-f:.]+\]$/
 
 const isHostLike = (host) =>
-    DOTTED_NAME.test(host) || IPV4.test(host) || IPV6.test(host)
+    !isReservedName(host) &&
+    (DOTTED_NAME.test(host) || IPV4.test(host) || IPV6.test(host))
 
 // --- scheme classification --------------------------------------------------
 //
@@ -204,9 +266,99 @@ export const normalizeHost = (authority) => {
 // to a couple of the literal forms the host appeared in, so a report can show
 // the reader what was actually in the file rather than only the normalized
 // name.
-export const findEndpoints = (source) => {
+// How close a URL must sit to a connection-API call to count as reachable.
+//
+// Correlating per file overclaims badly. Capture's 6.5 MB chunk contains
+// exactly three connection calls and seventeen external hosts; per file, all
+// seventeen were labelled "reachable from code that opens connections",
+// including a Leaflet marker PNG on a CDN, an OpenStreetMap attribution link
+// and a JSON-Schema identifier. Measured distances in that file:
+//
+//   nominatim.openstreetmap.org      324    the geocoding API it really calls
+//   dev.virtualearth.net             412    the other geocoding API
+//   cdnjs.cloudflare.com          10,410    a marker icon
+//   osm.org                       19,724    an attribution link
+//   json-schema.org            1,280,083    a $schema identifier
+//
+// The two real API endpoints sit within 412 characters of a call; the nearest
+// unrelated address is 25x further away. 2000 sits in that gap with room on
+// both sides.
+//
+// This is a second filter, not the only one: proximity alone is noisy in
+// dense minified code — in the maps bundle a documentation URL lands 252
+// characters from a call — but those are prose mentions, which the
+// address/mention rule has already removed before this applies.
+//
+// It under-claims by design. A bundler is free to put a URL in a config
+// object far from the fetch that consumes it, and that reads as an
+// observation rather than a warning. A warning that cannot be trusted is
+// worse than one that is occasionally missing.
+const DEFAULT_PROXIMITY_CHARS = 2000
+
+// Character offsets of every connection-API token, used to decide whether a
+// URL sits beside a call or merely in the same file.
+const findSinkPositions = (source, confirmedIds) => {
+    const positions = []
+    for (const sink of SINKS) {
+        if (confirmedIds && !confirmedIds.has(sink.id)) {
+            continue
+        }
+        const re = new RegExp(sink.pattern.source, 'g')
+        let match
+        while ((match = re.exec(source)) !== null) {
+            positions.push(match.index)
+            if (match.index === re.lastIndex) {
+                re.lastIndex += 1
+            }
+        }
+    }
+    return positions.sort((a, b) => a - b)
+}
+
+// Distance from `index` to the closest entry of a sorted position list.
+const nearestDistance = (positions, index) => {
+    if (positions.length === 0) {
+        return Infinity
+    }
+    let lo = 0
+    let hi = positions.length - 1
+    let best = Infinity
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1
+        best = Math.min(best, Math.abs(positions[mid] - index))
+        if (positions[mid] < index) {
+            lo = mid + 1
+        } else {
+            hi = mid - 1
+        }
+    }
+    return best
+}
+
+// `ast` is the result of astAnalysis.analyzeSource, or null when the file
+// could not be parsed. With it, two heuristics become facts: sink positions
+// come from real call sites rather than a token match, and whether a URL is an
+// address or prose is decided by where it sits in its literal rather than by
+// the character before it. Without it, the text path runs exactly as before —
+// a file that will not parse is still analyzed.
+export const findEndpoints = (source, { proximityChars, ast } = {}) => {
     const normalized = normalizeSource(source)
+    // Positions are taken from the normalized text so they line up with the
+    // URL matches. When the AST is available it decides *which* sinks are
+    // real — a `fetch` inside a string or a property named fetch is not a
+    // call — and only those kinds contribute positions.
+    const confirmed = ast
+        ? new Set(ast.sinkCalls.map((call) => call.id))
+        : null
+    const sinkPositions = findSinkPositions(normalized, confirmed)
+    const window = proximityChars ?? DEFAULT_PROXIMITY_CHARS
+    const addressHosts = ast ? addressHostsFrom(ast) : null
     const byHost = new Map()
+
+    // A URL recovered by decoding is always treated as an address: nothing
+    // encodes a documentation link. `decoded` marks it so the finding can say
+    // where it came from — that provenance is the finding.
+    const decodedPayloads = findDecodedUrls(normalized, ast?.literals)
 
     URL_LIKE.lastIndex = 0
     let match
@@ -221,10 +373,15 @@ export const findEndpoints = (source) => {
         }
         const existing = byHost.get(host)
         const sample = match[0].slice(0, 120)
-        const asAddress = beginsLiteral(normalized, match.index)
+        const asAddress = addressHosts
+            ? addressHosts.has(host)
+            : beginsLiteral(normalized, match.index)
+        const nearSink =
+            nearestDistance(sinkPositions, match.index) <= window
         if (existing) {
             existing.count += 1
             existing.addressCount += asAddress ? 1 : 0
+            existing.nearSink = existing.nearSink || nearSink
             if (existing.samples.length < 2 && !existing.samples.includes(sample)) {
                 existing.samples.push(sample)
             }
@@ -235,6 +392,7 @@ export const findEndpoints = (source) => {
             byHost.set(host, {
                 host,
                 addressCount: asAddress ? 1 : 0,
+                nearSink,
                 schemes: scheme ? [scheme] : [],
                 // An xn-- label is a non-ASCII name in disguise. Legitimate
                 // in a bundle serving an IDN, and also how a lookalike domain
@@ -248,6 +406,32 @@ export const findEndpoints = (source) => {
             })
         }
     }
+    for (const { decoded, index } of decodedPayloads) {
+        for (const host of hostsIn(decoded)) {
+            const existing = byHost.get(host)
+            const nearSink =
+                nearestDistance(sinkPositions, index) <= window
+            if (existing) {
+                existing.count += 1
+                existing.addressCount += 1
+                existing.decoded = true
+                existing.nearSink = existing.nearSink || nearSink
+            } else {
+                byHost.set(host, {
+                    host,
+                    addressCount: 1,
+                    decoded: true,
+                    nearSink,
+                    schemes: [],
+                    punycode: host.includes('xn--'),
+                    ip: IPV4.test(host) || IPV6.test(host),
+                    count: 1,
+                    samples: [decoded.slice(0, 120)],
+                })
+            }
+        }
+    }
+
     return [...byHost.values()]
 }
 
@@ -465,7 +649,8 @@ export const summarizeExternalEndpoints = (
                 existing.count += endpoint.count
                 existing.addressCount += endpoint.addressCount || 0
                 existing.files.add(file.src)
-                existing.reachable = existing.reachable || fileSinks.length > 0
+                existing.reachable = existing.reachable || Boolean(endpoint.nearSink)
+                existing.decoded = existing.decoded || Boolean(endpoint.decoded)
                 // One host can be reached over several schemes across an
                 // app's chunks. Keeping the union means a host seen once over
                 // https and once over http is still labelled cleartext.
@@ -486,7 +671,8 @@ export const summarizeExternalEndpoints = (
                     schemes: [...(endpoint.schemes || [])],
                     samples: [...endpoint.samples],
                     files: new Set([file.src]),
-                    reachable: fileSinks.length > 0,
+                    reachable: Boolean(endpoint.nearSink),
+                    decoded: Boolean(endpoint.decoded),
                 })
             }
         }
@@ -496,7 +682,14 @@ export const summarizeExternalEndpoints = (
     // used as an address. Reported as a count rather than listed: it is not a
     // finding, but dropping it silently would overstate how clean the app is.
     const all = [...byHost.values()]
-    const mentionedOnly = all.filter((entry) => entry.addressCount === 0)
+    // Named, not just counted. These are cheap to dismiss once seen — a
+    // reader recognises momentjs.com and stackoverflow.com immediately —
+    // whereas a bare count asks them to trust the classifier instead of
+    // checking it. Sorted so the list is stable between runs.
+    const mentionedOnly = all
+        .filter((entry) => entry.addressCount === 0)
+        .map((entry) => entry.host)
+        .sort()
 
     const hosts = all
         .filter((entry) => entry.addressCount > 0)
@@ -517,13 +710,26 @@ export const summarizeExternalEndpoints = (
         )
 
     const reachable = hosts.filter((h) => h.reachable)
+    const decoded = hosts.filter((h) => h.decoded)
+    // A host that only exists once a string is decoded was hidden on purpose.
+    // Nothing legitimate encodes a URL to keep it out of a text search — and
+    // measured across three real bundles, 1008 encoded-looking literals
+    // yielded not one. This is the one endpoint finding that fails an app
+    // rather than warning about it.
     const status =
-        hosts.length === 0 ? 'pass' : reachable.length > 0 ? 'warning' : 'info'
+        decoded.length > 0
+            ? 'fail'
+            : hosts.length === 0
+            ? 'pass'
+            : reachable.length > 0
+            ? 'warning'
+            : 'info'
 
     return {
         hosts,
         sinks: [...sinks],
         reachableCount: reachable.length,
+        mentionedOnly,
         mentionedOnlyCount: mentionedOnly.length,
         status,
     }

@@ -2,6 +2,7 @@
 // Import order matters: the polyfill must be evaluated before js-x-ray.
 import './bufferPolyfill'
 import { runASTAnalysis } from 'js-x-ray'
+import { parseModule, parseScript } from 'meriyah'
 import { processSource } from './fileProcessor'
 
 // The analysis half of the apps audit, running off the main thread.
@@ -31,6 +32,16 @@ import { processSource } from './fileProcessor'
 
 const analyze = runASTAnalysis
 
+// Modules first — bundles are ESM — then a script retry for the vendored
+// files that are not.
+const parse = (source) => {
+    try {
+        return parseModule(source, { next: true })
+    } catch {
+        return parseScript(source, { next: true })
+    }
+}
+
 let repository = null
 let limits = null
 
@@ -54,6 +65,7 @@ self.onmessage = async (event) => {
                 limits,
                 repository,
                 analyze,
+                parse,
             })
             self.postMessage({ type: 'result', id, result })
         } catch (err) {

@@ -97,6 +97,12 @@ const warningItem = ({ warning, count }) => {
 // needs the string that is actually in the bundle.
 const endpointItem = (endpoint) => {
     const flags = [
+        // Provenance first: a host that only exists once a string is decoded
+        // was deliberately hidden, which matters more than anything else on
+        // the line.
+        endpoint.decoded
+            ? i18n.t('recovered by decoding an encoded string')
+            : null,
         endpoint.reachable
             ? i18n.t('reachable from code that opens connections')
             : null,
@@ -176,7 +182,7 @@ export const buildFindingSections = (files, { external } = {}) => {
     // send anything anywhere.
     for (const endpoint of external?.hosts || []) {
         add(
-            endpoint.reachable ? 'medium' : 'info',
+            endpoint.decoded ? 'high' : endpoint.reachable ? 'medium' : 'info',
             i18n.t('External connections'),
             endpointItem(endpoint)
         )
@@ -194,9 +200,14 @@ export const buildFindingSections = (files, { external } = {}) => {
                 '{{count}} further host(s) appear only inside message text',
                 { count: external.mentionedOnlyCount }
             ),
-            detail: i18n.t(
-                'A URL quoted inside a sentence — a bundled library citing a bug report in an error message, for example — cannot be an address the app connects to, so these are not listed individually.'
-            ),
+            detail: [
+                external.mentionedOnly?.join(', '),
+                i18n.t(
+                    'A URL quoted inside a sentence — a bundled library citing a bug report in an error message, for example — cannot be an address the app connects to.'
+                ),
+            ]
+                .filter(Boolean)
+                .join(' — '),
         })
     }
 

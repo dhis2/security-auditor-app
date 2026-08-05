@@ -1,4 +1,5 @@
 import { getAnalyzer } from '../../utils/jsXRay'
+import { getSourceParser } from '../../utils/sourceParser'
 import { compareEntry } from './appsBaseline'
 import { resultStatus } from './classifyFindings'
 import { summarizeExternalEndpoints } from './externalEndpoints'
@@ -110,6 +111,7 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
                 analyze: options.analyze,
                 repository: retireRepository,
                 limits,
+                parse: options.parse,
             })
         } else {
             workerProcessor = await createWorkerProcessor({
@@ -126,6 +128,7 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
                         : null,
                     repository: retireRepository,
                     limits,
+                    parse: await getSourceParser(),
                 })
         }
     }

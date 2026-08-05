@@ -236,3 +236,29 @@ describe('external endpoint findings', () => {
         expect(titles).toContain('Connection APIs present in this app')
     })
 })
+
+describe('mention-only hosts', () => {
+    it('names them rather than only counting them', () => {
+        const [section] = buildFindingSections([], {
+            external: {
+                hosts: [],
+                sinks: [],
+                mentionedOnly: ['bugs.chromium.org', 'momentjs.com'],
+                mentionedOnlyCount: 2,
+            },
+        })
+        const [item] = section.groups[0].items
+        expect(section.severity).toBe('info')
+        expect(item.title).toContain('2')
+        expect(item.detail).toContain('bugs.chromium.org')
+        expect(item.detail).toContain('momentjs.com')
+    })
+
+    it('says nothing when every host was used as an address', () => {
+        expect(
+            buildFindingSections([], {
+                external: { hosts: [], sinks: [], mentionedOnly: [], mentionedOnlyCount: 0 },
+            })
+        ).toEqual([])
+    })
+})

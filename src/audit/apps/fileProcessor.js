@@ -1,4 +1,5 @@
 import { suppressBenign } from './suppressBenign'
+import { analyzeSource } from './astAnalysis'
 import { findEndpoints, findSinks } from './externalEndpoints'
 import { hashSource } from './hashSource'
 import { findModuleImports } from './moduleImports'
@@ -47,6 +48,7 @@ export const processSource = async ({
     limits,
     repository,
     analyze,
+    parse,
 }) => {
     const hash = await hashSource(source)
     const libraries = repository
@@ -56,8 +58,14 @@ export const processSource = async ({
     // Like hashing and library detection, this is a function of the raw text
     // and needs no parser — so it runs whatever `skipAnalysis` says. A file
     // too large to parse is exactly one you still want the destinations of.
-    const endpoints = findEndpoints(source)
-    const sinks = findSinks(source)
+    // One parse, shared by both consumers. Null when the file will not parse,
+    // in which case each falls back to its text analysis rather than losing
+    // the file.
+    const ast = analyzeSource(source, parse)
+    const endpoints = findEndpoints(source, { ast })
+    const sinks = ast
+        ? [...new Set(ast.sinkCalls.map((call) => call.id))]
+        : findSinks(source)
 
     if (skipAnalysis || typeof analyze !== 'function') {
         return { hash, libraries, imports, endpoints, sinks }
@@ -94,6 +102,6 @@ export const processSource = async ({
 // Build a processor that runs on whichever thread calls it. `analyze` is
 // resolved once and closed over, so the analyzer module is loaded a single
 // time per run rather than per file.
-export const createInThreadProcessor = ({ analyze, repository, limits }) => (
+export const createInThreadProcessor = ({ analyze, repository, limits, parse }) => (
     request
-) => processSource({ ...request, limits, repository, analyze })
+) => processSource({ ...request, limits, repository, analyze, parse })

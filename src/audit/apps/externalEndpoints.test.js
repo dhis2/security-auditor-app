@@ -184,6 +184,59 @@ describe('the allowlist admits only hosts nobody else can publish to', () => {
     })
 })
 
+describe('proximity to a connection call', () => {
+    it('treats a URL beside a call as reachable', () => {
+        const [entry] = findEndpoints('fetch("https://api.example.net/x")')
+        expect(entry.nearSink).toBe(true)
+    })
+
+    it('does not call a distant URL reachable just for sharing the file', () => {
+        // The Capture case: one 6.5 MB chunk, three connection calls, and a
+        // Leaflet marker PNG 10 KB away from the nearest of them. Per file
+        // that read as "reachable from code that opens connections".
+        const source =
+            'fetch("https://api.example.net/x");' +
+            'x'.repeat(50000) +
+            'const icon="https://cdn.example.net/marker.png"'
+        const hosts = Object.fromEntries(
+            findEndpoints(source).map((e) => [e.host, e.nearSink])
+        )
+        expect(hosts['api.example.net']).toBe(true)
+        expect(hosts['cdn.example.net']).toBe(false)
+    })
+
+    it('honours a configured window', () => {
+        const source =
+            'fetch("https://api.example.net/x")' +
+            'y'.repeat(3000) +
+            'const u="https://far.example.net/y"'
+        expect(
+            findEndpoints(source, { proximityChars: 10000 }).find(
+                (e) => e.host === 'far.example.net'
+            ).nearSink
+        ).toBe(true)
+    })
+})
+
+describe('reserved names that can never resolve', () => {
+    it.each([
+        'query-string.invalid',
+        'foo.test',
+        'bar.example',
+        'thing.localhost',
+        'example.com',
+        'www.example.org',
+    ])('ignores %s', (host) => {
+        expect(findEndpoints(`u("https://${host}/x")`)).toEqual([])
+    })
+
+    it('still reports a real host with a similar name', () => {
+        expect(
+            findEndpoints('u("https://invalid-example.net/x")').map((e) => e.host)
+        ).toEqual(['invalid-example.net'])
+    })
+})
+
 describe('addresses versus prose mentions', () => {
     const hostsOf = (source) => findEndpoints(source).map((e) => e.host)
 
@@ -240,6 +293,9 @@ describe('addresses versus prose mentions', () => {
         )
         expect(summary.hosts).toEqual([])
         expect(summary.mentionedOnlyCount).toBe(1)
+        // Named, not just counted: a bare count asks the reader to trust the
+        // classifier rather than check it.
+        expect(summary.mentionedOnly).toEqual(['bugs.chromium.org'])
         // Nothing addressable, so nothing to warn about.
         expect(summary.status).toBe('pass')
     })
@@ -262,6 +318,7 @@ describe('addresses versus prose mentions', () => {
         )
         expect(summary.hosts.map((h) => h.host)).toEqual(['x.example.net'])
         expect(summary.mentionedOnlyCount).toBe(0)
+        expect(summary.mentionedOnly).toEqual([])
         expect(summary.status).toBe('warning')
     })
 })
@@ -323,12 +380,16 @@ describe('isAllowedHost', () => {
 })
 
 describe('summarizeExternalEndpoints', () => {
+    // `nearSink` mirrors what findEndpoints computes: the URL sits within the
+    // proximity window of a connection call. Tests that pass sinks mean "and
+    // the URL is beside one".
     const file = (src, hostNames, sinks = []) => ({
         src,
         sinks,
         endpoints: hostNames.map((host) => ({
             host,
             count: 1,
+            nearSink: sinks.length > 0,
             // Used as an address, i.e. the URL begins its string literal.
             // Hosts named only inside prose are excluded from the summary.
             addressCount: 1,
@@ -347,7 +408,7 @@ describe('summarizeExternalEndpoints', () => {
         expect(summary).toMatchObject({ status: 'pass', hosts: [] })
     })
 
-    it('warns when a host shares a file with a connection API', () => {
+    it('warns when a host sits beside a connection call', () => {
         const summary = summarizeExternalEndpoints(
             [file('main.js', ['evil.example.net'], ['fetch'])],
             { instanceHost: 'dhis.example.org' }

