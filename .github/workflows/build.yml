@@ -22,7 +22,15 @@ jobs:
           cache: yarn
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        # --ignore-scripts blocks package lifecycle hooks, the primary code
+        # execution path for npm supply-chain attacks. Only 3 of ~773 packages
+        # in this tree declare one (core-js-pure: a donation message,
+        # esbuild: binary provisioning, ljharb-monorepo-symlink-test), and
+        # none are load-bearing -- esbuild resolves its binary from
+        # optionalDependencies (@esbuild/linux-x64).
+        # If a future dependency genuinely needs a hook, the build fails
+        # loudly here rather than silently executing it.
+        run: yarn install --frozen-lockfile --ignore-scripts
 
       - name: Build
         run: yarn build

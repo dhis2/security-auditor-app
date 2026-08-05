@@ -85,7 +85,9 @@ jobs:
         run: echo "value=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        # See the note in build.yml. The published bundle is built from this
+        # install, so blocking lifecycle hooks matters most here.
+        run: yarn install --frozen-lockfile --ignore-scripts
 
       - name: Build
         run: yarn build
