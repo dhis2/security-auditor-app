@@ -40,13 +40,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: main
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: yarn
@@ -97,7 +97,7 @@ jobs:
         run: yarn test
 
       - name: Commit and tag
-        uses: planetscale/ghcommit-action@v0.2.0
+        uses: planetscale/ghcommit-action@v0.2.22
         with:
           commit_message: "chore: release v${{ steps.version.outputs.value }}"
           repo: ${{ github.repository }}
@@ -113,7 +113,7 @@ jobs:
           git push origin "v${{ steps.version.outputs.value }}"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.value }}
           name: v${{ steps.version.outputs.value }}
