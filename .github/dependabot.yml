@@ -16,6 +16,21 @@ updates:
       schedule:
           interval: weekly
       open-pull-requests-limit: 5
+      ignore:
+          # React 19 is not supported by the DHIS2 platform libraries. As of
+          # August 2026 @dhis2/ui 10.17.0 (including @alpha) and
+          # @dhis2/app-runtime 3.17.3 (including 3.18.0-beta.2) all declare
+          # react "^16.13 || ^18". Installing React 19 produces 115
+          # incorrect-peer warnings and moves @dhis2/app-adapter out of the
+          # hoisted root, which breaks any incremental build against an
+          # existing .d2/ directory.
+          #
+          # Remove both entries once those packages widen their peer range to
+          # include ^19. Minor and patch updates within React 18 still flow.
+          - dependency-name: react
+            update-types: ['version-update:semver-major']
+          - dependency-name: react-dom
+            update-types: ['version-update:semver-major']
       groups:
           # Version updates. A group without `applies-to` covers version
           # updates only -- security updates ignore these and open one PR per
