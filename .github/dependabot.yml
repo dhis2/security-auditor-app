@@ -16,6 +16,19 @@ updates:
       schedule:
           interval: weekly
       open-pull-requests-limit: 5
+      # Malicious package versions are typically yanked within hours to days,
+      # so waiting before adopting one is cheap insurance. Dependabot already
+      # applies a 3-day default; this extends it, with longer for majors since
+      # those carry the most change.
+      # Applies to version updates only -- security updates deliberately
+      # bypass cooldown, which is the correct precedence.
+      # default-days is the backstop for updates Dependabot cannot classify
+      # by semver; the three semver-specific keys cover everything else.
+      cooldown:
+          default-days: 7
+          semver-major-days: 30
+          semver-minor-days: 7
+          semver-patch-days: 3
       ignore:
           # React 19 is not supported by the DHIS2 platform libraries. As of
           # August 2026 @dhis2/ui 10.17.0 (including @alpha) and
