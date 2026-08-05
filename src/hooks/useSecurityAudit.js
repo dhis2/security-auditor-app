@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useDataEngine } from '@dhis2/app-runtime'
+import i18n from '@dhis2/d2-i18n'
 import { runAudit } from '../audit/runAudit'
 
 // Sort findings: failures first, then warnings, then errors, then passes.
@@ -79,7 +80,10 @@ export const useSecurityAudit = (config = {}) => {
                                       status: override?.status ?? 'error',
                                       message:
                                           override?.message ??
-                                          `Error executing check: ${error.message}`,
+                                          i18n.t(
+                                              'Error executing check: {{message}}',
+                                              { message: error.message }
+                                          ),
                                       details: override?.details ?? null,
                                   }
                                 : finding

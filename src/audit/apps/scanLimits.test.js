@@ -14,6 +14,8 @@ describe('resolveScanLimits', () => {
             maxFileBytes: DEFAULT_SCAN_LIMITS.maxAppFileMb * MB,
             minEncodedLiteralLength:
                 DEFAULT_SCAN_LIMITS.minEncodedLiteralLength,
+            maxConsecutiveUnfetchable:
+                DEFAULT_SCAN_LIMITS.maxConsecutiveUnfetchable,
         })
     })
 
@@ -23,12 +25,14 @@ describe('resolveScanLimits', () => {
             maxAppScanMb: 2,
             maxAppFileMb: 1,
             minEncodedLiteralLength: 0,
+            maxConsecutiveUnfetchable: 3,
         })
         expect(limits).toEqual({
             maxFiles: 7,
             maxTotalBytes: 2 * MB,
             maxFileBytes: 1 * MB,
             minEncodedLiteralLength: 0,
+            maxConsecutiveUnfetchable: 3,
         })
     })
 

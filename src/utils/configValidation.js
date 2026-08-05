@@ -56,6 +56,10 @@ const RULES = {
         getLabel: () => i18n.t('Minimum encoded literal length reported'),
         ...SCAN_LIMIT_BOUNDS.minEncodedLiteralLength,
     },
+    maxConsecutiveUnfetchable: {
+        getLabel: () => i18n.t('Maximum unfetchable paths in a row'),
+        ...SCAN_LIMIT_BOUNDS.maxConsecutiveUnfetchable,
+    },
     retireMaxAgeMinutes: {
         getLabel: () => i18n.t('Vulnerability signature max age (minutes)'),
         ...SCAN_LIMIT_BOUNDS.retireMaxAgeMinutes,

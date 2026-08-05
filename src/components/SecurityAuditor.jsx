@@ -97,10 +97,7 @@ export const SecurityAuditor = () => {
                     onStart={handleStartAppsAudit}
                     retireInfo={apps.retireInfo}
                     signatures={apps.signatures}
-                    signaturesStale={apps.signaturesStale}
                     signatureError={apps.signatureError}
-                    refreshingSignatures={apps.refreshingSignatures}
-                    onFetchSignatures={apps.fetchSignatures}
                     baseline={apps.baseline}
                     baselineError={apps.baselineError}
                     savingBaseline={apps.savingBaseline}
@@ -108,7 +105,15 @@ export const SecurityAuditor = () => {
                 />
             )}
 
-            {activeTab === 'config' && <ConfigurationPanel />}
+            {activeTab === 'config' && (
+                <ConfigurationPanel
+                    signatures={apps.signatures}
+                    signaturesStale={apps.signaturesStale}
+                    signatureError={apps.signatureError}
+                    refreshingSignatures={apps.refreshingSignatures}
+                    onFetchSignatures={apps.fetchSignatures}
+                />
+            )}
 
             {activeTab === 'systeminfo' && <SystemInfo />}
 

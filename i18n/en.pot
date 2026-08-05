@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-08-05T05:27:12.451Z\n"
-"PO-Revision-Date: 2026-08-05T05:27:12.451Z\n"
+"POT-Creation-Date: 2026-08-05T06:20:19.743Z\n"
+"PO-Revision-Date: 2026-08-05T06:20:19.743Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -47,6 +47,119 @@ msgstr "Failed to load the integrity baseline"
 
 msgid "Failed to save the integrity baseline"
 msgstr "Failed to save the integrity baseline"
+
+msgid "Minified code"
+msgstr "Minified code"
+
+msgid ""
+"Identifier names in this file average about one character, which means it "
+"was minified. That is how every production JavaScript build is shipped. It "
+"describes how the file was compiled, not anything in it."
+msgstr ""
+"Identifier names in this file average about one character, which means it "
+"was minified. That is how every production JavaScript build is shipped. It "
+"describes how the file was compiled, not anything in it."
+
+msgid "Uses eval()"
+msgstr "Uses eval()"
+
+msgid ""
+"eval() runs a string as code. Several long-standing libraries use it "
+"internally — ExtJS, OpenLayers and MapLibre all do — so it is expected in a "
+"bundle that includes them. It is worth attention only if it appears in an "
+"app’s own code, or if the string being run could come from user input."
+msgstr ""
+"eval() runs a string as code. Several long-standing libraries use it "
+"internally — ExtJS, OpenLayers and MapLibre all do — so it is expected in a "
+"bundle that includes them. It is worth attention only if it appears in an "
+"app’s own code, or if the string being run could come from user input."
+
+msgid "References the Function constructor"
+msgstr "References the Function constructor"
+
+msgid ""
+"Bundled libraries use Function(\"return this\") to locate the global "
+"object; lodash and most UMD wrappers contain it. The constructor is "
+"reported because it can also turn a string into code, but a fixed string "
+"like this one cannot be influenced by an attacker."
+msgstr ""
+"Bundled libraries use Function(\"return this\") to locate the global "
+"object; lodash and most UMD wrappers contain it. The constructor is "
+"reported because it can also turn a string into code, but a fixed string "
+"like this one cannot be influenced by an attacker."
+
+msgid "Long encoded-looking string"
+msgstr "Long encoded-looking string"
+
+msgid ""
+"A long run of hex or base64-like characters. In practice these are "
+"checksums, file-format signatures, or embedded assets such as icons. It "
+"would only matter if the string decoded to code that the app then ran."
+msgstr ""
+"A long run of hex or base64-like characters. In practice these are "
+"checksums, file-format signatures, or embedded assets such as icons. It "
+"would only matter if the string decoded to code that the app then ran."
+
+msgid "String assembled by concatenation"
+msgstr "String assembled by concatenation"
+
+msgid ""
+"The file builds strings by joining fragments, which is one way obfuscated "
+"code hides text. Minifiers and template libraries do the same thing for "
+"ordinary reasons."
+msgstr ""
+"The file builds strings by joining fragments, which is one way obfuscated "
+"code hides text. Minifiers and template libraries do the same thing for "
+"ordinary reasons."
+
+msgid "Could not be parsed"
+msgstr "Could not be parsed"
+
+msgid ""
+"The analyzer could not read this file, so it was not examined. This is "
+"usually newer JavaScript syntax the bundled analyzer does not support, not "
+"a problem with the file."
+msgstr ""
+"The analyzer could not read this file, so it was not examined. This is "
+"usually newer JavaScript syntax the bundled analyzer does not support, not "
+"a problem with the file."
+
+msgid "Matches a known obfuscator"
+msgstr "Matches a known obfuscator"
+
+msgid ""
+"The file carries the fingerprint of {{tool}}. Legitimate apps are minified, "
+"not obfuscated, so this is worth investigating."
+msgstr ""
+"The file carries the fingerprint of {{tool}}. Legitimate apps are minified, "
+"not obfuscated, so this is worth investigating."
+
+msgid "a known obfuscation tool"
+msgstr "a known obfuscation tool"
+
+msgid "Loads code from a computed location"
+msgstr "Loads code from a computed location"
+
+msgid ""
+"The file imports a module whose address is built at runtime rather than "
+"written literally. Code splitting does this legitimately; so does code that "
+"fetches a payload from elsewhere."
+msgstr ""
+"The file imports a module whose address is built at runtime rather than "
+"written literally. Code splitting does this legitimately; so does code that "
+"fetches a payload from elsewhere."
+
+msgid "Uses a weak hash"
+msgstr "Uses a weak hash"
+
+msgid ""
+"MD5 or SHA-1 appears in this file. Both are unsuitable for signatures or "
+"passwords, though they remain common for non-security uses such as cache "
+"keys."
+msgstr ""
+"MD5 or SHA-1 appears in this file. Both are unsuitable for signatures or "
+"passwords, though they remain common for non-security uses such as cache "
+"keys."
 
 msgid "HTTP {{status}} fetching Retire.js signatures"
 msgstr "HTTP {{status}} fetching Retire.js signatures"
@@ -362,6 +475,9 @@ msgstr "frame-ancestors contains a broad source"
 msgid "CSP header is properly configured"
 msgstr "CSP header is properly configured"
 
+msgid "(uses 'strict-dynamic')"
+msgstr "(uses 'strict-dynamic')"
+
 msgid "Password Policy Configuration"
 msgstr "Password Policy Configuration"
 
@@ -621,20 +737,11 @@ msgstr "Manual"
 msgid "Unknown"
 msgstr "Unknown"
 
-msgid "Pass"
-msgstr "Pass"
-
-msgid "Warning"
-msgstr "Warning"
-
-msgid "Fail"
-msgstr "Fail"
-
-msgid "Info"
-msgstr "Info"
-
 msgid "{{current}} of {{total}} apps scanned"
 msgstr "{{current}} of {{total}} apps scanned"
+
+msgid ", line {{line}}"
+msgstr ", line {{line}}"
 
 msgid "fixed in {{version}}"
 msgstr "fixed in {{version}}"
@@ -644,6 +751,12 @@ msgstr "Hide"
 
 msgid "Details"
 msgstr "Details"
+
+msgid "Code analysis"
+msgstr "Code analysis"
+
+msgid "No risk found — reported for information"
+msgstr "No risk found — reported for information"
 
 msgid "Skipped ({{reason}})"
 msgstr "Skipped ({{reason}})"
@@ -741,14 +854,8 @@ msgstr ""
 "downloads current signatures if the stored set has aged out; if that "
 "download fails, the scan continues with the newest set available."
 
-msgid "These have aged out and will be refreshed when a scan starts."
-msgstr "These have aged out and will be refreshed when a scan starts."
-
-msgid "Fetching..."
-msgstr "Fetching..."
-
-msgid "Fetch latest signatures"
-msgstr "Fetch latest signatures"
+msgid "Signatures can be fetched on demand from the Configuration tab."
+msgstr "Signatures can be fetched on demand from the Configuration tab."
 
 msgid "Integrity baseline"
 msgstr "Integrity baseline"
@@ -821,9 +928,6 @@ msgstr "Status"
 
 msgid "Findings"
 msgstr "Findings"
-
-msgid "Running"
-msgstr "Running"
 
 msgid "DHIS2 Security Audit Report"
 msgstr "DHIS2 Security Audit Report"
@@ -1046,6 +1150,47 @@ msgstr "Export Configuration"
 msgid "Import Configuration"
 msgstr "Import Configuration"
 
+msgid "Vulnerability Signatures"
+msgstr "Vulnerability Signatures"
+
+msgid ""
+"The Retire.js advisory data the Apps Audit checks bundled libraries "
+"against. Starting a scan downloads a current set automatically once the "
+"stored one passes the max age above; this fetches one now regardless."
+msgstr ""
+"The Retire.js advisory data the Apps Audit checks bundled libraries "
+"against. Starting a scan downloads a current set automatically once the "
+"stored one passes the max age above; this fetches one now regardless."
+
+msgid "Fetching..."
+msgstr "Fetching..."
+
+msgid "Fetch Latest Signatures"
+msgstr "Fetch Latest Signatures"
+
+msgid "Current signatures"
+msgstr "Current signatures"
+
+msgid "Downloading..."
+msgstr "Downloading..."
+
+msgid ""
+"Downloaded {{when}}. Older than the max age — the next scan will refresh "
+"them."
+msgstr ""
+"Downloaded {{when}}. Older than the max age — the next scan will refresh "
+"them."
+
+msgid "Downloaded {{when}}."
+msgstr "Downloaded {{when}}."
+
+msgid ""
+"Never downloaded on this instance. The Apps Audit is using the signatures "
+"bundled with the app, which still work offline but age with each release."
+msgstr ""
+"Never downloaded on this instance. The Apps Audit is using the signatures "
+"bundled with the app, which still work offline but age with each release."
+
 msgid "API Console"
 msgstr "API Console"
 
@@ -1116,6 +1261,9 @@ msgstr "Maximum MB per app file"
 msgid "Minimum encoded literal length reported"
 msgstr "Minimum encoded literal length reported"
 
+msgid "Maximum unfetchable paths in a row"
+msgstr "Maximum unfetchable paths in a row"
+
 msgid "Vulnerability signature max age (minutes)"
 msgstr "Vulnerability signature max age (minutes)"
 
@@ -1130,6 +1278,42 @@ msgstr "{{label}} must be a whole number"
 
 msgid "{{label}} must be between {{min}} and {{max}}"
 msgstr "{{label}} must be between {{min}} and {{max}}"
+
+msgid "Pass"
+msgstr "Pass"
+
+msgid "Warning"
+msgstr "Warning"
+
+msgid "Risk"
+msgstr "Risk"
+
+msgid "Info"
+msgstr "Info"
+
+msgid "Running"
+msgstr "Running"
+
+msgid "PASS"
+msgstr "PASS"
+
+msgid "WARNING"
+msgstr "WARNING"
+
+msgid "RISK"
+msgstr "RISK"
+
+msgid "ERROR"
+msgstr "ERROR"
+
+msgid "INFO"
+msgstr "INFO"
+
+msgid "RUNNING"
+msgstr "RUNNING"
+
+msgid "UNKNOWN"
+msgstr "UNKNOWN"
 
 msgid "Security Auditor Version"
 msgstr "Security Auditor Version"

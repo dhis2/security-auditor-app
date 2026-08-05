@@ -80,6 +80,7 @@ describe('REQUIRED_CONFIG_KEYS', () => {
             'maxAppScanMb',
             'maxAppFileMb',
             'minEncodedLiteralLength',
+            'maxConsecutiveUnfetchable',
             'retireMaxAgeMinutes',
         ])
     })

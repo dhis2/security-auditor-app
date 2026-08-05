@@ -117,3 +117,26 @@
     border-left: 3px solid #1976d2;
     margin: 4px 0 12px 0;
 }
+
+/* Heading over a group of file findings ("Code analysis" / "No risk found").
+   Separating the two is the point of the grouping, so the heading needs to
+   read as a divider rather than as another finding. */
+.sectionHeading {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6e7a8a;
+    margin: 12px 0 4px;
+    padding-top: 8px;
+    border-top: 1px solid #e8edf2;
+}
+
+/* The plain-language explanation under a finding. Indented and lighter so the
+   finding titles remain scannable. */
+.warningDetail {
+    margin: 2px 0 0 8px;
+    color: #6e7a8a;
+    line-height: 1.45;
+    max-width: 70ch;
+}

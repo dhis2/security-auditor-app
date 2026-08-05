@@ -17,7 +17,13 @@ import {
 import { downloadBlob } from '../utils/download'
 import classes from './ConfigurationPanel.module.css'
 
-export const ConfigurationPanel = () => {
+export const ConfigurationPanel = ({
+    signatures,
+    signaturesStale,
+    signatureError,
+    refreshingSignatures,
+    onFetchSignatures,
+}) => {
     const { config, loading, error, resetConfig, saveConfig } = useAuditConfig()
 
     const [localConfig, setLocalConfig] = useState(config)
@@ -373,6 +379,76 @@ export const ConfigurationPanel = () => {
                 </Button>
             </ButtonStrip>
         </Card>
+
+        <Card className={classes.card}>
+            <div className={classes.header}>
+                <h3 className={classes.title}>
+                    {i18n.t('Vulnerability Signatures')}
+                </h3>
+                <p className={classes.subtitle}>
+                    {i18n.t(
+                        'The Retire.js advisory data the Apps Audit checks bundled libraries against. Starting a scan downloads a current set automatically once the stored one passes the max age above; this fetches one now regardless.'
+                    )}
+                </p>
+            </div>
+
+            <SignatureStatus
+                signatures={signatures}
+                stale={signaturesStale}
+                error={signatureError}
+                refreshing={refreshingSignatures}
+            />
+
+            <ButtonStrip className={classes.actions}>
+                <Button
+                    onClick={onFetchSignatures}
+                    disabled={refreshingSignatures || !onFetchSignatures}
+                >
+                    {refreshingSignatures
+                        ? i18n.t('Fetching...')
+                        : i18n.t('Fetch Latest Signatures')}
+                </Button>
+            </ButtonStrip>
+        </Card>
     </div>
+    )
+}
+
+// Where the current signature set came from and how old it is. Lives beside
+// the max-age setting because the two only make sense together: the setting
+// decides when a scan refreshes on its own, and this says what it would be
+// refreshing from.
+const SignatureStatus = ({ signatures, stale, error, refreshing }) => {
+    const retrieved = signatures?.retrievedAt
+        ? new Date(signatures.retrievedAt)
+        : null
+    const when =
+        retrieved && !Number.isNaN(retrieved.getTime())
+            ? retrieved.toLocaleString()
+            : null
+
+    return (
+        <NoticeBox
+            title={i18n.t('Current signatures')}
+            warning={Boolean(error) || stale}
+            success={Boolean(when) && !error && !stale}
+        >
+            {refreshing
+                ? i18n.t('Downloading...')
+                : when
+                ? stale
+                    ? i18n.t(
+                          'Downloaded {{when}}. Older than the max age — the next scan will refresh them.',
+                          { when }
+                      )
+                    : i18n.t('Downloaded {{when}}.', { when })
+                : i18n.t(
+                      'Never downloaded on this instance. The Apps Audit is using the signatures bundled with the app, which still work offline but age with each release.'
+                  )}
+            {error
+                ? ' ' +
+                  i18n.t('Last attempt failed: {{message}}', { message: error })
+                : ''}
+        </NoticeBox>
     )
 }

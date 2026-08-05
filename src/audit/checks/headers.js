@@ -499,7 +499,11 @@ export const getHeaderChecks = () => [
                           warnings: warnings.join('; '),
                       })
                     : i18n.t('CSP header is properly configured'),
-                details: `Content-Security-Policy${isReportOnly ? '-Report-Only' : ''}: ${cspHeader}${usesStrictDynamic ? " (uses 'strict-dynamic')" : ''}`,
+                details: `Content-Security-Policy${isReportOnly ? '-Report-Only' : ''}: ${cspHeader}${
+                    usesStrictDynamic
+                        ? ` ${i18n.t("(uses 'strict-dynamic')")}`
+                        : ''
+                }`,
             }
         },
     },

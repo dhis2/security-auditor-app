@@ -29,7 +29,11 @@ jobs:
         env:
           DT_API_URL: ${{ vars.DEPENDENCYTRACK_URL }}
           DT_API_KEY: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
+          PROJECT_NAME: ${{ github.event.repository.name }}
+          PROJECT_VERSION: ${{ github.ref_name }}
         run: |
+          set -eo pipefail
+
           if [ -z "$DT_API_URL" ]; then
             echo "::error::DEPENDENCYTRACK_URL repo variable is not set"
             exit 1
@@ -38,13 +42,65 @@ jobs:
             echo "::error::DEPENDENCYTRACK_APIKEY secret is not set"
             exit 1
           fi
-          curl -X POST "$DT_API_URL" \
+
+          response=$(curl -sS -X POST "$DT_API_URL" \
               --fail-with-body \
               -H "X-Api-Key: $DT_API_KEY" \
               -F "autoCreate=true" \
-              -F "projectName=${{ github.event.repository.name }}" \
-              -F "projectVersion=${{ github.ref_name }}" \
-              -F "bom=@bom.json"
+              -F "projectName=$PROJECT_NAME" \
+              -F "projectVersion=$PROJECT_VERSION" \
+              -F "bom=@bom.json")
+
+          token=$(printf '%s' "$response" | jq -r '.token // empty')
+          if [ -z "$token" ]; then
+            echo "::error::DependencyTrack returned no processing token: $response"
+            exit 1
+          fi
+          echo "Queued $PROJECT_NAME/$PROJECT_VERSION (token $token)"
+
+          # POST only queues the BOM — it returns before anything is ingested.
+          # Poll until the ingestion task drains, so the job reflects the real
+          # outcome instead of just "accepted".
+          deadline=$((SECONDS + 600))
+          while true; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Timed out after 10m waiting for BOM processing"
+              exit 1
+            fi
+            sleep 10
+            processing=$(curl -sS --fail-with-body \
+              -H "X-Api-Key: $DT_API_KEY" \
+              "$DT_API_URL/token/$token" | jq -r '.processing')
+            [ "$processing" = "false" ] && break
+          done
+          echo "Processing finished"
+
+          # `processing: false` means the task ended, not that it succeeded, so
+          # confirm the project actually holds components. Best-effort: reading
+          # the portfolio needs VIEW_PORTFOLIO, which an upload-only key lacks.
+          DT_V1="${DT_API_URL%/bom}"
+          http=$(curl -sS -o lookup.json -w '%{http_code}' --get \
+            -H "X-Api-Key: $DT_API_KEY" \
+            --data-urlencode "name=$PROJECT_NAME" \
+            --data-urlencode "version=$PROJECT_VERSION" \
+            "$DT_V1/project/lookup") || http=000
+
+          if [ "$http" != "200" ]; then
+            echo "::warning::Could not verify component count (HTTP $http). Grant VIEW_PORTFOLIO to enable this check."
+            exit 0
+          fi
+
+          uuid=$(jq -r '.uuid // empty' lookup.json)
+          count=$(curl -sS -o /dev/null -D - \
+            -H "X-Api-Key: $DT_API_KEY" \
+            "$DT_V1/component/project/$uuid?limit=1" \
+            | tr -d '\r' | awk 'tolower($1)=="x-total-count:"{print $2}')
+
+          echo "Ingested components: ${count:-unknown}"
+          if [ "${count:-0}" = "0" ]; then
+            echo "::error::BOM processed but the project contains no components"
+            exit 1
+          fi
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v7

@@ -2,7 +2,10 @@ import { getAnalyzer } from '../../utils/jsXRay'
 import { compareEntry } from './appsBaseline'
 import { resultStatus } from './classifyFindings'
 import { fetchInstalledApps } from './fetchInstalledApps'
+import { createInThreadProcessor } from './fileProcessor'
 import { getRetireRepository } from './retireRepository'
+import { resolveScanLimits } from './scanLimits'
+import { createWorkerProcessor } from './workerProcessor'
 import { scanApp } from './scanApp'
 
 // Run a configurable number of async tasks in parallel. Resolves after all
@@ -56,8 +59,6 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
     // the caller (which owns dataStore access) so this runner stays pure.
     const baselineApps = options.baseline?.apps || {}
 
-    const analyze = options.analyze || (await getAnalyzer())
-
     // Loaded once per run and shared by every app. A failure here must not
     // sink the audit: without it the AST analysis and the integrity baseline
     // still work, and the missing piece is reported rather than assumed
@@ -84,6 +85,38 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
             : { unavailable: true }
     )
 
+    // Where the per-file work runs. The analysis is synchronous and takes
+    // about a second per bundle, so on the main thread it freezes the tab for
+    // the length of the scan. A worker keeps the UI responsive; if one cannot
+    // be created — no Worker, a restrictive CSP — the identical code runs
+    // in-thread instead, which is how the audit behaved before.
+    const limits = resolveScanLimits(config)
+    let workerProcessor = null
+    let processFile = options.processFile
+    if (!processFile) {
+        if (options.analyze) {
+            // Tests inject an analyzer directly; keep them off the worker.
+            processFile = createInThreadProcessor({
+                analyze: options.analyze,
+                repository: retireRepository,
+                limits,
+            })
+        } else {
+            workerProcessor = await createWorkerProcessor({
+                repository: retireRepository,
+                limits,
+            })
+            processFile =
+                workerProcessor?.process ||
+                createInThreadProcessor({
+                    analyze: await getAnalyzer(),
+                    repository: retireRepository,
+                    limits,
+                })
+        }
+    }
+    callbacks.onWorker?.({ active: Boolean(workerProcessor) })
+
     let completed = 0
     const results = await runWithConcurrency(
         appsList,
@@ -93,11 +126,10 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
             try {
                 const result = await scanApp({
                     app,
-                    analyze,
+                    processFile,
                     fetchText: options.fetchText,
                     contextPath: options.contextPath,
                     config,
-                    retireRepository,
                 })
                 const stored = baselineApps[app.key]
                 const withIntegrity = {
@@ -133,6 +165,7 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
         }
     )
 
+    workerProcessor?.terminate()
     callbacks.onComplete?.(results)
     return results
 }

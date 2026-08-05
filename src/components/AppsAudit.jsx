@@ -15,11 +15,13 @@ import i18n from '@dhis2/d2-i18n'
 import { APP_SOURCE, appSource } from '../audit/apps/appSource'
 import { INTEGRITY, describeIntegrity } from '../audit/apps/appsBaseline'
 import { vulnerableLibraries } from '../audit/apps/classifyFindings'
+import { explainWarning, hasRiskWarnings } from '../audit/apps/explainFindings'
 import { useInstanceInfo } from '../hooks/useInstanceInfo'
 import { APP_VERSION as appVersion } from '../version'
 import { downloadBlob } from '../utils/download'
 import { escapeHtml } from '../utils/html'
 import { getServerHeader } from '../utils/instanceInfo'
+import { reportStatusLabel, statusLabel } from '../utils/statusLabels'
 import { getReportSystemInfoItems } from '../utils/systemInfoItems'
 import classes from './AppsAudit.module.css'
 
@@ -44,18 +46,13 @@ const STATUS_CLASS = {
     info: classes.statusInfo,
 }
 
-const STATUS_LABEL = {
-    pass: () => i18n.t('Pass'),
-    warning: () => i18n.t('Warning'),
-    fail: () => i18n.t('Fail'),
-    error: () => i18n.t('Error'),
-    info: () => i18n.t('Info'),
-}
-
 const StatusBadge = ({ status }) => {
     const cls = STATUS_CLASS[status] || classes.statusInfo
-    const label = (STATUS_LABEL[status] || (() => i18n.t('Unknown')))()
-    return <span className={`${classes.statusBadge} ${cls}`}>{label}</span>
+    return (
+        <span className={`${classes.statusBadge} ${cls}`}>
+            {statusLabel(status)}
+        </span>
+    )
 }
 
 const ProgressBar = ({ current, total, currentAppKey }) => {
@@ -128,6 +125,10 @@ const LibraryFindings = ({ files }) => {
         </div>
     )
 }
+
+// Where in the file a finding sits. Rendered next to the finding value in
+// both the in-app details and the exported report.
+const lineSuffix = (line) => (line ? i18n.t(', line {{line}}', { line }) : '')
 
 const describeVulnerability = (vuln) => {
     const ids = vuln.identifiers?.CVE?.join(', ') || vuln.identifiers?.githubID
@@ -204,9 +205,16 @@ const AppRow = ({ result }) => {
                                 </div>
                             )}
                             <LibraryFindings files={result.files} />
-                            {(result.files || []).map((file) => (
-                                <FileFindings key={file.src} file={file} />
-                            ))}
+                            <FileSection
+                                heading={i18n.t('Code analysis')}
+                                files={partitionFiles(result.files).risky}
+                            />
+                            <FileSection
+                                heading={i18n.t(
+                                    'No risk found — reported for information'
+                                )}
+                                files={partitionFiles(result.files).informational}
+                            />
                         </div>
                     </TableCell>
                 </TableRow>
@@ -215,6 +223,12 @@ const AppRow = ({ result }) => {
     )
 }
 
+// A file's code-analysis findings, explained.
+//
+// Each one says what triggered it and whether it matters, because the kind
+// alone ("unsafe-stmt (Function)") tells a reader nothing they can act on.
+// Findings that describe how the file was built rather than what is in it sit
+// under a heading that states plainly that no risk was found.
 const FileFindings = ({ file }) => {
     if (file.error) {
         return (
@@ -240,23 +254,82 @@ const FileFindings = ({ file }) => {
             <div className={classes.warningRow}>
                 <span className={classes.fileSrc}>{file.src}</span>
             </div>
-            {file.warnings.map((w, idx) => (
-                <div key={idx} className={classes.warningRow}>
-                    <span className={classes.warningKind}>{w.kind}</span>
-                    {w.value ? (
-                        <span>
-                            {' '}
-                            ({w.value}
-                            {w.location?.start
-                                ? `, line ${w.location.start.line}`
-                                : ''}
-                            )
-                        </span>
-                    ) : null}
-                </div>
+            {groupWarnings(file.warnings).map((group) => (
+                <WarningRow key={group.key} group={group} />
             ))}
         </div>
     )
+}
+
+// A titled group of file findings. Renders nothing when the group is empty,
+// so an app with only informational findings does not get an empty "Code
+// analysis" heading above it.
+const FileSection = ({ heading, files }) =>
+    files.length === 0 ? null : (
+        <div>
+            <div className={classes.sectionHeading}>{heading}</div>
+            {files.map((file) => (
+                <FileFindings key={file.src} file={file} />
+            ))}
+        </div>
+    )
+
+// The same finding usually fires many times in one file — ExtJS trips the
+// eval check five times over. Repeating an identical row (and an identical
+// explanation) five times buries the point rather than making it, so
+// identical findings collapse into one row with a count.
+const groupWarnings = (warnings) => {
+    const groups = new Map()
+    for (const warning of warnings || []) {
+        const key = `${warning.kind}:${warning.value ?? ''}`
+        const existing = groups.get(key)
+        if (existing) {
+            existing.count += 1
+        } else {
+            groups.set(key, { key, warning, count: 1 })
+        }
+    }
+    return [...groups.values()]
+}
+
+const WarningRow = ({ group }) => {
+    const { warning, count } = group
+    const explained = explainWarning(warning)
+    return (
+        <div className={classes.warningRow}>
+            <span className={classes.warningKind}>
+                {explained ? explained.title : warning.kind}
+            </span>
+            {count > 1 ? <span> {i18n.t('({{count}}x)', { count })}</span> : null}
+            {/* The raw value is only shown when we have nothing better to say
+                about the finding — otherwise the explanation carries it, and
+                a bare "(1.4173309575166464)" is noise. */}
+            {!explained && warning.value ? (
+                <span> ({warning.value})</span>
+            ) : null}
+            {explained ? (
+                <div className={classes.warningDetail}>{explained.detail}</div>
+            ) : null}
+        </div>
+    )
+}
+
+// Split an app's files into the ones carrying a risk finding and the ones
+// that only produced build-artefact observations, so the two can be shown
+// under headings that say which is which.
+const partitionFiles = (files) => {
+    const risky = []
+    const informational = []
+    for (const file of files || []) {
+        if (file.error || file.skipped) {
+            informational.push(file)
+        } else if (hasRiskWarnings(file.warnings)) {
+            risky.push(file)
+        } else if ((file.warnings || []).length > 0) {
+            informational.push(file)
+        }
+    }
+    return { risky, informational }
 }
 
 export const AppsAudit = ({
@@ -268,10 +341,7 @@ export const AppsAudit = ({
     onStart,
     retireInfo,
     signatures,
-    signaturesStale,
     signatureError,
-    refreshingSignatures,
-    onFetchSignatures,
     baseline,
     baselineError,
     savingBaseline,
@@ -326,10 +396,7 @@ export const AppsAudit = ({
                     retireInfo={retireInfo}
                     vulnerable={0}
                     signatures={signatures}
-                    signaturesStale={signaturesStale}
                     signatureError={signatureError}
-                    refreshing={refreshingSignatures}
-                    onFetch={onFetchSignatures}
                 />
             </div>
         )
@@ -416,10 +483,7 @@ export const AppsAudit = ({
                 retireInfo={retireInfo}
                 vulnerable={vulnerableAppCount}
                 signatures={signatures}
-                signaturesStale={signaturesStale}
                 signatureError={signatureError}
-                refreshing={refreshingSignatures}
-                onFetch={onFetchSignatures}
             />
             <BaselinePanel
                 baseline={baseline}
@@ -476,59 +540,42 @@ const formatSignatureDate = (value) => {
         : parsed.toLocaleString()
 }
 
-const RetirePanel = ({
-    retireInfo,
-    vulnerable,
-    signatures,
-    signaturesStale,
-    signatureError,
-    refreshing,
-    onFetch,
-}) => {
+const RetirePanel = ({ retireInfo, vulnerable, signatures, signatureError }) => {
     const origin = originLabel(retireInfo, signatures)
     const unavailable = retireInfo?.unavailable
     return (
-        <div className={classes.panelWithAction}>
-            <NoticeBox
-                title={i18n.t('Vulnerable library check')}
-                error={!unavailable && vulnerable > 0}
-                warning={Boolean(unavailable || signatureError)}
-                success={!unavailable && !signatureError && vulnerable === 0}
-            >
-                {unavailable
-                    ? i18n.t(
-                          'The Retire.js signature data could not be loaded, so apps were not checked for known-vulnerable libraries.'
-                      )
-                    : vulnerable > 0
-                    ? i18n.t(
-                          '{{vulnerable}} app(s) bundle a library with a known vulnerability.',
-                          { vulnerable }
-                      )
-                    : retireInfo
-                    ? i18n.t('No known-vulnerable libraries found.')
-                    : i18n.t(
-                          'Apps are checked against the Retire.js advisory database. Starting a scan downloads current signatures if the stored set has aged out; if that download fails, the scan continues with the newest set available.'
-                      )}
-                {origin ? ` ${origin}` : ''}
-                {signaturesStale && !refreshing
-                    ? ' ' +
-                      i18n.t(
-                          'These have aged out and will be refreshed when a scan starts.'
-                      )
-                    : ''}
-                {signatureError
-                    ? ' ' +
-                      i18n.t('Last download attempt failed: {{message}}', {
-                          message: signatureError,
-                      })
-                    : ''}
-            </NoticeBox>
-            <Button onClick={onFetch} disabled={refreshing}>
-                {refreshing
-                    ? i18n.t('Fetching...')
-                    : i18n.t('Fetch latest signatures')}
-            </Button>
-        </div>
+        <NoticeBox
+            title={i18n.t('Vulnerable library check')}
+            error={!unavailable && vulnerable > 0}
+            warning={Boolean(unavailable || signatureError)}
+            success={!unavailable && !signatureError && vulnerable === 0}
+        >
+            {unavailable
+                ? i18n.t(
+                      'The Retire.js signature data could not be loaded, so apps were not checked for known-vulnerable libraries.'
+                  )
+                : vulnerable > 0
+                ? i18n.t(
+                      '{{vulnerable}} app(s) bundle a library with a known vulnerability.',
+                      { vulnerable }
+                  )
+                : retireInfo
+                ? i18n.t('No known-vulnerable libraries found.')
+                : i18n.t(
+                      'Apps are checked against the Retire.js advisory database. Starting a scan downloads current signatures if the stored set has aged out; if that download fails, the scan continues with the newest set available.'
+                  )}
+            {origin ? ` ${origin}` : ''}
+            {signatureError
+                ? ' ' +
+                  i18n.t('Last download attempt failed: {{message}}', {
+                      message: signatureError,
+                  })
+                : ''}
+            {' '}
+            {i18n.t(
+                'Signatures can be fetched on demand from the Configuration tab.'
+            )}
+        </NoticeBox>
     )
 }
 
@@ -597,13 +644,6 @@ const BaselinePanel = ({
     )
 }
 
-const sourceLabelForReport = (source) => {
-    if (source === APP_SOURCE.BUNDLED) return 'Bundled'
-    if (source === APP_SOURCE.APP_HUB) return 'App Hub'
-    if (source === APP_SOURCE.MANUAL) return 'Manual'
-    return 'Unknown'
-}
-
 const formatFileFindings = (file) => {
     if (file.error) {
         return `<div class="file-error">${escapeHtml(file.src)}: ${escapeHtml(
@@ -618,20 +658,50 @@ const formatFileFindings = (file) => {
     if (!file.warnings || file.warnings.length === 0) {
         return ''
     }
-    const rows = file.warnings
-        .map((w) => {
-            const value = w.value ? ` (${escapeHtml(w.value)})` : ''
-            const line = w.location?.start?.line
-                ? `, line ${w.location.start.line}`
+    const rows = groupWarnings(file.warnings)
+        .map(({ warning, count }) => {
+            const explained = explainWarning(warning)
+            const title = explained
+                ? escapeHtml(explained.title)
+                : `<code>${escapeHtml(warning.kind)}</code>`
+            const times = count > 1 ? escapeHtml(` (${count}x)`) : ''
+            // Same rule as the UI: the raw value only appears when there is
+            // no explanation to carry it.
+            const value =
+                !explained && warning.value
+                    ? escapeHtml(` (${warning.value})`)
+                    : ''
+            const line = escapeHtml(lineSuffix(warning.location?.start?.line))
+            const detail = explained
+                ? `<div class="finding-detail">${escapeHtml(
+                      explained.detail
+                  )}</div>`
                 : ''
-            return `<li><code>${escapeHtml(w.kind)}</code>${value}${escapeHtml(
-                line
-            )}</li>`
+            return `<li>${title}${times}${value}${line}${detail}</li>`
         })
         .join('')
     return `<div class="file-block"><div class="file-src">${escapeHtml(
         file.src
     )}</div><ul>${rows}</ul></div>`
+}
+
+// Risk findings first under their own heading, then everything that only
+// describes how the file was built, under a heading that says so. Mirrors the
+// grouping in the UI.
+const formatFileSections = (files) => {
+    const { risky, informational } = partitionFiles(files)
+    const section = (heading, group) =>
+        group.length === 0
+            ? ''
+            : `<div class="finding-section">${escapeHtml(heading)}</div>` +
+              group.map(formatFileFindings).filter(Boolean).join('')
+    return (
+        section(i18n.t('Code analysis'), risky) +
+        section(
+            i18n.t('No risk found — reported for information'),
+            informational
+        )
+    )
 }
 
 const buildAppsReportHtml = ({
@@ -674,7 +744,7 @@ const buildAppsReportHtml = ({
     const rows = sorted
         .map((result) => {
             const source = appSource(result.app)
-            const status = (result.status || 'pass').toUpperCase()
+            const status = reportStatusLabel(result.status || 'pass')
             const statusClass = `status-${(result.status || 'pass').toLowerCase()}`
             const librariesHtml = vulnerableLibraries(result.files)
                 .map((library) => {
@@ -706,17 +776,14 @@ const buildAppsReportHtml = ({
                       )}</div>`
                     : result.note
                     ? `<div class="file-skipped">${escapeHtml(result.note)}</div>`
-                    : (result.files || [])
-                          .map((f) => formatFileFindings(f))
-                          .filter(Boolean)
-                          .join(''))
+                    : formatFileSections(result.files))
             return `        <tr>
             <td>
                 <strong>${escapeHtml(result.app.name || result.app.key)}</strong>
                 <div class="app-key">${escapeHtml(result.app.key)}</div>
             </td>
             <td>${escapeHtml(result.app.version || '-')}</td>
-            <td>${escapeHtml(sourceLabelForReport(source))}</td>
+            <td>${escapeHtml(sourceLabel(source))}</td>
             <td class="${statusClass}">${escapeHtml(status)}</td>
             <td>${detailsHtml}</td>
         </tr>`
@@ -747,6 +814,8 @@ const buildAppsReportHtml = ({
         .file-src { font-family: monospace; font-size: 0.9em; color: #424242; }
         .file-error { font-size: 0.9em; color: #c62828; }
         .file-skipped { font-size: 0.9em; color: #757575; font-style: italic; }
+        .finding-section { font-size: 0.8em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.04em; color: #6e7a8a; margin: 14px 0 6px; padding-top: 8px; border-top: 1px solid #e8edf2; }
+        .finding-detail { font-size: 0.9em; color: #6e7a8a; margin-top: 2px; max-width: 70ch; }
         ul { margin: 4px 0 8px 18px; padding: 0; }
         li { font-size: 0.9em; color: #4a4a4a; }
         code { font-family: monospace; }

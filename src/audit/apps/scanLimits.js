@@ -61,6 +61,31 @@ export const DEFAULT_SCAN_LIMITS = {
     // judgement call in that range, which is part of why it is configurable.
     minEncodedLiteralLength: 16,
 
+    // How many discovered paths may fail to fetch in a row before the crawl
+    // gives up on an app.
+    //
+    // Specifiers are found by scanning string literals, so the crawler can
+    // walk into a table of paths that are not modules of this app —
+    // moment.js's locale list being the worst case. Measured across eight
+    // apps on 2.43.1, walking each graph until it ran dry:
+    //
+    //   Microplanning            118 discovered, all dead ends
+    //   use-case-configuration   119 discovered, all dead ends
+    //   interpretation           105 discovered, all dead ends
+    //   dashboard                1 real module, then 3 dead ends (vendor/*)
+    //   reports                  1 real module, then 2 dead ends (zlib/*)
+    //   metadata-management      119 discovered, all real (a genuinely large
+    //                            graph — bounded by maxAppFilesScanned, not
+    //                            by this)
+    //
+    // In none of them did a real module appear after even one dead end, so
+    // any threshold costs no coverage. 5 sits above the largest number of
+    // genuine dead-end references seen in one app (3), so those are still
+    // listed in full, while a locale table is abandoned after 5 requests
+    // instead of 118. Raise it towards the maximum to effectively disable the
+    // check.
+    maxConsecutiveUnfetchable: 5,
+
     // How old a downloaded Retire.js signature set may be before the app
     // offers to fetch a newer one.
     //
@@ -85,6 +110,7 @@ export const SCAN_LIMIT_BOUNDS = {
     maxAppScanMb: { min: 1, max: 256 },
     maxAppFileMb: { min: 1, max: 64 },
     minEncodedLiteralLength: { min: 0, max: 128 },
+    maxConsecutiveUnfetchable: { min: 1, max: 1000 },
     // 0 (never refresh automatically) to four weeks. Wide on purpose: this
     // governs the app's only outbound request, which is an operator's call.
     retireMaxAgeMinutes: { min: 0, max: 40320 },
@@ -107,5 +133,6 @@ export const resolveScanLimits = (config = {}) => {
         maxTotalBytes: pick('maxAppScanMb') * MB,
         maxFileBytes: pick('maxAppFileMb') * MB,
         minEncodedLiteralLength: pick('minEncodedLiteralLength'),
+        maxConsecutiveUnfetchable: pick('maxConsecutiveUnfetchable'),
     }
 }

@@ -658,6 +658,129 @@ describe('runAppsAudit', () => {
         expect(onRetireRepository).toHaveBeenCalledWith({ unavailable: true })
     })
 
+    it('abandons a crawl after a run of unfetchable discovered paths', async () => {
+        // moment.js's locale table is a list of paths that are not modules of
+        // the app at all. Following it produced 118 requests for one app and
+        // 856 candidates for another, every one a 404. Measured across eight
+        // apps, a real module never appeared after even one dead end.
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const locales = [
+            './af.js',
+            './ar-dz.js',
+            './bg.js',
+            './bn.js',
+            './cs.js',
+            './da.js',
+            './el.js',
+            './fi.js',
+        ]
+        const requested = []
+        const fetchText = async (url) => {
+            requested.push(url)
+            if (url.endsWith('index.html?redirect=false')) {
+                return {
+                    text: '<script src="./main.js"></script>',
+                    finalUrl: url,
+                }
+            }
+            if (url.endsWith('/main.js')) {
+                return {
+                    text: locales.map((l) => `"${l}"`).join(','),
+                    finalUrl: url,
+                }
+            }
+            throw new Error('HTTP 404')
+        }
+        const [result] = await runAppsAudit(
+            engine,
+            { ...TEST_CONFIG, maxConsecutiveUnfetchable: 3 },
+            {},
+            { analyze: cleanAnalyze, fetchText }
+        )
+        // Three dead ends tried, then the crawl stops — not all eight.
+        const localeRequests = requested.filter((u) => u.includes('/af.js') || /\/(ar-dz|bg|bn|cs|da|el|fi)\.js$/.test(u))
+        expect(localeRequests).toHaveLength(3)
+        const summary = result.files[result.files.length - 1]
+        expect(summary.skipped).toMatch(/in a row could not be fetched/)
+        expect(result.status).toBe('pass')
+    })
+
+    it('keeps crawling when dead ends are interleaved with real modules', async () => {
+        // The counter has to reset on success, or an app with a couple of
+        // stale references scattered through a large graph would be cut off.
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const fetchText = async (url) => {
+            if (url.endsWith('index.html?redirect=false')) {
+                return { text: '<script src="./main.js"></script>', finalUrl: url }
+            }
+            if (url.endsWith('/main.js')) {
+                return { text: '"./gone1.js","./real.js","./gone2.js"', finalUrl: url }
+            }
+            if (url.endsWith('/real.js')) {
+                return { text: 'const ok=1', finalUrl: url }
+            }
+            throw new Error('HTTP 404')
+        }
+        const [result] = await runAppsAudit(
+            engine,
+            { ...TEST_CONFIG, maxConsecutiveUnfetchable: 2 },
+            {},
+            { analyze: cleanAnalyze, fetchText }
+        )
+        expect(result.files.map((f) => f.src)).toContain('./real.js')
+        expect(result.status).toBe('pass')
+    })
+
+    it('runs in-thread when no Worker is available', async () => {
+        // jsdom has no Worker, so this is the fallback path — the same code
+        // the browser runs when a CSP forbids workers.
+        const onWorker = jest.fn()
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, { onWorker }, {
+            analyze: cleanAnalyze,
+            fetchText: makeFetchText({
+                'https://server/api/apps/a/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/api/apps/a/main.js': 'console.log(1)',
+            }),
+        })
+        expect(onWorker).toHaveBeenCalledWith({ active: false })
+        expect(result.status).toBe('pass')
+        expect(result.files[0].warnings).toEqual([])
+    })
+
+    it('accepts an injected processor and reports its analyzer failures', async () => {
+        // The worker returns analyzer failures as data rather than throwing,
+        // so a crash on one file costs that file's warnings and nothing else.
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const processFile = jest.fn(async () => ({
+            hash: 'abc',
+            libraries: [],
+            imports: [],
+            analyzeError: "Cannot read properties of undefined (reading 'type')",
+        }))
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            processFile,
+            fetchText: makeFetchText({
+                'https://server/api/apps/a/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/api/apps/a/main.js': 'console.log(1)',
+            }),
+        })
+        expect(processFile).toHaveBeenCalled()
+        expect(result.files[0].error).toMatch(/Analyzer failed/)
+        expect(result.files[0].hash).toBe('abc')
+        expect(result.status).toBe('error')
+    })
+
     it('handles a /api/apps fetch failure without throwing', async () => {
         const engine = {
             query: jest.fn(() => Promise.reject(new Error('forbidden'))),

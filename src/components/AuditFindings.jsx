@@ -18,40 +18,25 @@ import { APP_VERSION as appVersion } from '../version'
 import { downloadBlob } from '../utils/download'
 import { escapeHtml } from '../utils/html'
 import { getServerHeader } from '../utils/instanceInfo'
+import { reportStatusLabel, statusLabel } from '../utils/statusLabels'
 import { getReportSystemInfoItems } from '../utils/systemInfoItems'
 import classes from './AuditFindings.module.css'
 
-const StatusBadge = ({ status }) => {
-    const getStatusConfig = (status) => {
-        switch (status) {
-            case 'pass':
-                return { label: i18n.t('Pass'), className: classes.statusPass }
-            case 'warning':
-                return {
-                    label: i18n.t('Warning'),
-                    className: classes.statusWarning,
-                }
-            case 'fail':
-                return { label: i18n.t('Fail'), className: classes.statusFail }
-            case 'error':
-                return {
-                    label: i18n.t('Error'),
-                    className: classes.statusError,
-                }
-            case 'running':
-                return {
-                    label: i18n.t('Running'),
-                    className: classes.statusRunning,
-                }
-            default:
-                return {
-                    label: i18n.t('Unknown'),
-                    className: classes.statusUnknown,
-                }
-        }
-    }
+// Label text comes from utils/statusLabels so this tab and the Apps Audit
+// cannot drift apart — notably `fail` reads as "Risk" in both.
+const STATUS_CLASS = {
+    pass: classes.statusPass,
+    warning: classes.statusWarning,
+    fail: classes.statusFail,
+    error: classes.statusError,
+    running: classes.statusRunning,
+}
 
-    const config = getStatusConfig(status)
+const StatusBadge = ({ status }) => {
+    const config = {
+        label: statusLabel(status),
+        className: STATUS_CLASS[status] || classes.statusUnknown,
+    }
 
     return (
         <span className={`${classes.statusBadge} ${config.className}`}>
@@ -216,7 +201,7 @@ ${getReportSystemInfoItems(systemInfo, { webServer: serverHeader, appVersion })
             }
             findings.forEach((finding) => {
                 const statusClass = STATUS_CLASSES[finding.status] || 'status-error'
-                const statusLabel = (finding.status || 'unknown').toUpperCase()
+                const statusLabel = reportStatusLabel(finding.status)
                 htmlContent += `
             <tr>
                 <td>

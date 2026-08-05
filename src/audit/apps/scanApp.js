@@ -1,28 +1,10 @@
 import i18n from '@dhis2/d2-i18n'
-import { suppressBenign } from './classifyFindings'
 import { findEntryAssets } from './findScripts'
-import { hashSource } from './hashSource'
-import { findModuleImports } from './moduleImports'
-import { scanFile as retireScanFile } from './retireScan'
 import { resolveScanLimits } from './scanLimits'
 
 // Size and crawl bounds come from the audit config — see scanLimits.js for
 // each default and the measurement behind it.
 
-// Warning kinds that carry near-zero signal in practice and are dropped
-// unconditionally. We tried gating these on js-x-ray's `isMinified` flag,
-// but that heuristic stays false on many real React/Vite bundles whose
-// surviving DOM/Fiber identifier names (focusedElem, selectionRange,
-// containerInfo, parentNode, …) push the identifier-length average back up.
-//
-//   unsafe-assign  — fires on any `obj[someProperty] = value` shape. Hits
-//                    React reconciler bookkeeping (e.alternate, c.stateNode,
-//                    r.tag, …) and DOM property writes constantly. Measured:
-//                    219 hits on an untouched react-dom production build.
-//   unsafe-regex   — safe-regex star-height check; matches moment's ISO-8601
-//                    parser and similar bounded-but-nested patterns shipped
-//                    by date/parsing libs.
-const NOISY_KINDS = new Set(['unsafe-assign', 'unsafe-regex'])
 
 // DHIS2 2.42+ serves every app through the global app shell: a request for
 // the app's index.html answers 302 → /apps/<key>, which returns the *shell's*
@@ -107,11 +89,10 @@ const isLoginRedirect = (finalUrl) =>
 // `analyze`, `fetchText`, and `contextPath` are test-injection seams.
 export const scanApp = async ({
     app,
-    analyze,
+    processFile,
     fetchText = defaultFetchText,
     contextPath,
     config,
-    retireRepository,
 }) => {
     const limits = resolveScanLimits(config)
     const indexRequestUrl = withBypass(buildIndexUrl(app, contextPath))
@@ -171,10 +152,9 @@ export const scanApp = async ({
         files: await crawl({
             entries,
             indexBaseUrl,
-            analyze,
             fetchText,
             limits,
-            retireRepository,
+            processFile,
         }),
     }
 }
@@ -184,10 +164,9 @@ export const scanApp = async ({
 const crawl = async ({
     entries,
     indexBaseUrl,
-    analyze,
     fetchText,
     limits,
-    retireRepository,
+    processFile,
 }) => {
     const appDir = dirOf(indexBaseUrl)
     const queue = entries.map((src) => ({
@@ -198,6 +177,7 @@ const crawl = async ({
     const seen = new Set(queue.map((item) => item.url))
     const files = []
     let totalBytes = 0
+    let consecutiveUnfetchable = 0
 
     while (queue.length > 0) {
         if (
@@ -216,14 +196,29 @@ const crawl = async ({
         }
 
         const item = queue.shift()
-        const file = await scanFile(item, {
-            analyze,
-            fetchText,
-            limits,
-            retireRepository,
-        })
+        const file = await scanFile(item, { fetchText, limits, processFile })
         files.push(file)
         totalBytes += file.sizeBytes || 0
+
+        // Specifiers are found by scanning string literals, which picks up
+        // tables of paths that are not modules of this app at all — moment's
+        // locale list is the worst case, and produced 856 candidate files for
+        // one app, every one a request that comes back as a 404 page. A real
+        // module graph never has a run of dead ends, so a run of them means
+        // we have walked into such a table and should stop.
+        consecutiveUnfetchable = file.unfetchable ? consecutiveUnfetchable + 1 : 0
+        if (consecutiveUnfetchable >= limits.maxConsecutiveUnfetchable) {
+            files.push({
+                src: i18n.t('{{count}} further file(s)', {
+                    count: queue.length,
+                }),
+                skipped: i18n.t(
+                    'stopped after {{count}} discovered paths in a row could not be fetched',
+                    { count: consecutiveUnfetchable }
+                ),
+            })
+            break
+        }
 
         // Only follow imports out of files we actually read, and only within
         // the app's own directory — a root-absolute entry may legitimately
@@ -254,10 +249,7 @@ const resolveUrl = (src, base) => {
 // an SPA fallback or a directory listing always does.
 const looksLikeHtml = (source) => /^\s*(<!doctype|<html|<\?xml|<)/i.test(source)
 
-const scanFile = async (
-    { src, url, discovered },
-    { analyze, fetchText, limits, retireRepository }
-) => {
+const scanFile = async ({ src, url, discovered }, { fetchText, limits, processFile }) => {
     let response
     try {
         response = await fetchText(url)
@@ -265,7 +257,7 @@ const scanFile = async (
         // A specifier found by literal scanning may not be a real module
         // path. Don't report that as an error against the app.
         if (discovered) {
-            return { src, skipped: i18n.t('not fetchable') }
+            return { src, skipped: i18n.t('not fetchable'), unfetchable: true }
         }
         return {
             src,
@@ -282,59 +274,47 @@ const scanFile = async (
             src,
             skipped: i18n.t('server did not return JavaScript'),
             sizeBytes: source.length,
+            unfetchable: discovered,
         }
     }
-    // Hash before anything can bail out. Integrity and analysis answer
-    // different questions and shouldn't share a failure mode: a file that is
-    // too large to parse, or that the analyzer chokes on, is still perfectly
-    // able to tell us whether it changed since the last audit.
-    const hash = await hashSource(source)
 
-    // Known-vulnerable library detection, likewise independent of the AST
-    // analyzer: it is regex matching over the raw text, so it still works on
-    // a file too large to parse.
-    const libraries = retireRepository
-        ? retireScanFile({ src, content: source }, retireRepository)
-        : []
+    // Too large to parse, but still worth hashing and matching against the
+    // library signatures — the processor skips only the analysis.
+    const skipAnalysis = source.length > limits.maxFileBytes
 
-    if (source.length > limits.maxFileBytes) {
+    const { hash, libraries, imports, warnings, isMinified, analyzeError } =
+        await processFile({ src, source, skipAnalysis })
+
+    if (skipAnalysis) {
         return {
             src,
             hash,
             libraries,
+            imports,
             skipped: i18n.t('file exceeds size limit'),
             sizeBytes: source.length,
         }
     }
-
-    const imports = findModuleImports(source)
-    try {
-        const result = analyze(source)
-        const warnings = suppressBenign(
-            (result?.warnings || []).filter((w) => !NOISY_KINDS.has(w.kind)),
-            source,
-            limits
-        )
+    if (analyzeError) {
         return {
             src,
-            warnings,
-            imports,
             hash,
             libraries,
-            isMinified: !!result?.isMinified,
-            sizeBytes: source.length,
-        }
-    } catch (err) {
-        return {
-            src,
             imports,
-            hash,
-            libraries,
             sizeBytes: source.length,
             error: i18n.t('Analyzer failed: {{message}}', {
-                message: err.message,
+                message: analyzeError,
             }),
         }
+    }
+    return {
+        src,
+        warnings,
+        imports,
+        hash,
+        libraries,
+        isMinified,
+        sizeBytes: source.length,
     }
 }
 
