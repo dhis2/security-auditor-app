@@ -1,3 +1,4 @@
+import { installWebCrypto, removeWebCrypto } from '../../testUtils/webCrypto'
 import { runAppsAudit } from './runAppsAudit'
 import { __setAnalyzerForTests } from '../../utils/jsXRay'
 
@@ -446,6 +447,215 @@ describe('runAppsAudit', () => {
         expect(result.files).toHaveLength(3)
         expect(result.files[1].skipped).toMatch(/exceeds size limit/)
         expect(result.files[2].skipped).toMatch(/crawl limit reached/)
+    })
+
+    it('fails an app whose code changed without a version change', async () => {
+        const restore = installWebCrypto()
+        try {
+            const engine = makeEngine([
+                {
+                    key: 'dashboard',
+                    version: '1.0.0',
+                    baseUrl: 'https://server/dhis-web-dashboard',
+                },
+            ])
+            const fetchText = makeFetchText({
+                'https://server/dhis-web-dashboard/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/dhis-web-dashboard/main.js': 'console.log("tampered")',
+            })
+            // Baseline recorded a different hash for the same version.
+            const baseline = {
+                apps: {
+                    dashboard: {
+                        version: '1.0.0',
+                        files: { './main.js': 'a'.repeat(64) },
+                    },
+                },
+            }
+            const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+                analyze: cleanAnalyze,
+                fetchText,
+                baseline,
+            })
+            expect(result.integrity.state).toBe('drift')
+            expect(result.integrity.changed).toEqual(['./main.js'])
+            // Drift outranks a clean analyzer result.
+            expect(result.status).toBe('fail')
+        } finally {
+            restore()
+        }
+    })
+
+    it('passes an app that matches its baseline', async () => {
+        const restore = installWebCrypto()
+        try {
+            const engine = makeEngine([
+                {
+                    key: 'dashboard',
+                    version: '1.0.0',
+                    baseUrl: 'https://server/dhis-web-dashboard',
+                },
+            ])
+            const fetchText = makeFetchText({
+                'https://server/dhis-web-dashboard/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/dhis-web-dashboard/main.js': 'console.log(1)',
+            })
+            const opts = { analyze: cleanAnalyze, fetchText }
+            // First run records what is there; second run compares to it.
+            const [first] = await runAppsAudit(engine, TEST_CONFIG, {}, opts)
+            expect(first.integrity.state).toBe('new')
+
+            const baseline = {
+                apps: {
+                    dashboard: {
+                        version: '1.0.0',
+                        files: { './main.js': first.files[0].hash },
+                    },
+                },
+            }
+            const [second] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+                ...opts,
+                baseline,
+            })
+            expect(second.integrity.state).toBe('unchanged')
+            expect(second.status).toBe('pass')
+        } finally {
+            restore()
+        }
+    })
+
+    it('hashes a file that was too large to analyze', async () => {
+        // Integrity and analysis answer different questions; capture's 6.4 MB
+        // chunk is unparseable here but must still be covered by the baseline.
+        const restore = installWebCrypto()
+        try {
+            const engine = makeEngine([
+                { key: 'a', baseUrl: 'https://server/api/apps/a' },
+            ])
+            const [result] = await runAppsAudit(
+                engine,
+                { ...TEST_CONFIG, maxAppFileMb: 1 },
+                {},
+                {
+                    analyze: cleanAnalyze,
+                    fetchText: makeFetchText({
+                        'https://server/api/apps/a/index.html?redirect=false':
+                            '<script src="./big.js"></script>',
+                        'https://server/api/apps/a/big.js': 'x'.repeat(2 * 1024 * 1024),
+                    }),
+                }
+            )
+            expect(result.files[0].skipped).toMatch(/exceeds size limit/)
+            expect(result.files[0].hash).toMatch(/^[0-9a-f]{64}$/)
+        } finally {
+            restore()
+        }
+    })
+
+    it('reports integrity as unknown when hashing is unavailable', async () => {
+        const restore = removeWebCrypto()
+        try {
+            const engine = makeEngine([
+                { key: 'a', baseUrl: 'https://server/api/apps/a' },
+            ])
+            const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+                analyze: cleanAnalyze,
+                fetchText: makeFetchText({
+                    'https://server/api/apps/a/index.html?redirect=false':
+                        '<script src="./main.js"></script>',
+                    'https://server/api/apps/a/main.js': 'console.log(1)',
+                }),
+            })
+            expect(result.integrity.state).toBe('unknown')
+            // Not knowing must not be reported as a failure.
+            expect(result.status).toBe('pass')
+        } finally {
+            restore()
+        }
+    })
+
+    it('fails an app that bundles a known-vulnerable library', async () => {
+        const engine = makeEngine([
+            { key: 'a', version: '1.0.0', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const retireRepository = {
+            retrievedAt: '2026-08-05',
+            components: {
+                lodash: {
+                    extractors: {
+                        filecontentreplace: [
+                            '/VERSION *= *[\'"]([0-9][0-9.a-z_\\-]+)[\'"]/$1/',
+                        ],
+                    },
+                    vulnerabilities: [
+                        {
+                            below: '4.18.0',
+                            severity: 'high',
+                            identifiers: { CVE: ['CVE-2021-23337'] },
+                        },
+                    ],
+                },
+            },
+        }
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze: cleanAnalyze,
+            retireRepository,
+            fetchText: makeFetchText({
+                'https://server/api/apps/a/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/api/apps/a/main.js': 'var VERSION="4.17.21";',
+            }),
+        })
+        // The analyzer reported nothing; the library finding sets the verdict.
+        expect(result.status).toBe('fail')
+        const [library] = result.files[0].libraries
+        expect(library).toMatchObject({ component: 'lodash', version: '4.17.21' })
+        expect(library.vulnerabilities[0].identifiers.CVE).toEqual([
+            'CVE-2021-23337',
+        ])
+    })
+
+    it('reports the signature date so a clean result can be weighed', async () => {
+        const onRetireRepository = jest.fn()
+        await runAppsAudit(
+            makeEngine([{ key: 'a', baseUrl: 'https://server/api/apps/a' }]),
+            TEST_CONFIG,
+            { onRetireRepository },
+            {
+                analyze: cleanAnalyze,
+                retireRepository: { retrievedAt: '2026-08-05', components: {} },
+                fetchText: async (url) => ({ text: '<html></html>', finalUrl: url }),
+            }
+        )
+        expect(onRetireRepository).toHaveBeenCalledWith({
+            retrievedAt: '2026-08-05',
+        })
+    })
+
+    it('keeps auditing when the signature data cannot be loaded', async () => {
+        // Losing the library check must not cost us the AST analysis or the
+        // integrity baseline — and the gap has to be reported, not assumed
+        // clean.
+        const onRetireRepository = jest.fn()
+        const [result] = await runAppsAudit(
+            makeEngine([{ key: 'a', baseUrl: 'https://server/api/apps/a' }]),
+            TEST_CONFIG,
+            { onRetireRepository },
+            {
+                analyze: cleanAnalyze,
+                retireRepository: null,
+                fetchText: makeFetchText({
+                    'https://server/api/apps/a/index.html?redirect=false':
+                        '<script src="./main.js"></script>',
+                    'https://server/api/apps/a/main.js': 'var VERSION="4.17.21";',
+                }),
+            }
+        )
+        expect(result.status).toBe('pass')
+        expect(result.files[0].libraries).toEqual([])
+        expect(onRetireRepository).toHaveBeenCalledWith({ unavailable: true })
     })
 
     it('handles a /api/apps fetch failure without throwing', async () => {

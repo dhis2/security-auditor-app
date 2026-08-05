@@ -13,6 +13,8 @@ import {
 } from '@dhis2/ui'
 import i18n from '@dhis2/d2-i18n'
 import { APP_SOURCE, appSource } from '../audit/apps/appSource'
+import { INTEGRITY, describeIntegrity } from '../audit/apps/appsBaseline'
+import { vulnerableLibraries } from '../audit/apps/classifyFindings'
 import { useInstanceInfo } from '../hooks/useInstanceInfo'
 import { APP_VERSION as appVersion } from '../version'
 import { downloadBlob } from '../utils/download'
@@ -92,10 +94,61 @@ const hasDetails = (result) =>
     Boolean(
         result.error ||
             result.note ||
+            integrityNote(result) ||
+            vulnerableLibraries(result.files).length > 0 ||
             (result.files || []).some(
                 (f) => f.error || f.skipped || (f.warnings || []).length > 0
             )
     )
+
+// One line per vulnerable library: what it is, what is wrong, and the CVE to
+// look up. The fixed-in version is the actionable part — it tells whoever
+// maintains the app exactly what to upgrade to.
+const LibraryFindings = ({ files }) => {
+    const libraries = vulnerableLibraries(files)
+    if (libraries.length === 0) {
+        return null
+    }
+    return (
+        <div>
+            {libraries.map((library) => (
+                <div key={`${library.component}@${library.version}`}>
+                    <div className={classes.warningRow}>
+                        <span className={classes.warningKind}>
+                            {library.component} {library.version}
+                        </span>
+                    </div>
+                    {library.vulnerabilities.map((vuln, idx) => (
+                        <div key={idx} className={classes.warningRow}>
+                            {describeVulnerability(vuln)}
+                        </div>
+                    ))}
+                </div>
+            ))}
+        </div>
+    )
+}
+
+const describeVulnerability = (vuln) => {
+    const ids = vuln.identifiers?.CVE?.join(', ') || vuln.identifiers?.githubID
+    const summary = vuln.identifiers?.summary
+    const parts = [
+        vuln.severity ? `[${vuln.severity}]` : null,
+        ids,
+        summary,
+        vuln.below ? i18n.t('fixed in {{version}}', { version: vuln.below }) : null,
+    ].filter(Boolean)
+    return parts.join(' — ')
+}
+
+// Only worth showing when it says something an admin would act on. "Matches
+// the baseline" on every row is noise.
+const integrityNote = (result) =>
+    result.integrity &&
+    result.integrity.state !== INTEGRITY.UNCHANGED &&
+    result.integrity.state !== INTEGRITY.NEW
+        ? describeIntegrity(result.integrity, result.baselineEntry)
+        : null
 
 const AppRow = ({ result }) => {
     const [expanded, setExpanded] = useState(false)
@@ -145,6 +198,12 @@ const AppRow = ({ result }) => {
                                     {result.note}
                                 </div>
                             )}
+                            {integrityNote(result) && (
+                                <div className={classes.warningRow}>
+                                    {integrityNote(result)}
+                                </div>
+                            )}
+                            <LibraryFindings files={result.files} />
                             {(result.files || []).map((file) => (
                                 <FileFindings key={file.src} file={file} />
                             ))}
@@ -207,6 +266,16 @@ export const AppsAudit = ({
     currentAppKey,
     error,
     onStart,
+    retireInfo,
+    signatures,
+    signaturesStale,
+    signatureError,
+    refreshingSignatures,
+    onFetchSignatures,
+    baseline,
+    baselineError,
+    savingBaseline,
+    onAcceptBaseline,
 }) => {
     const [generating, setGenerating] = useState(false)
     const [exportError, setExportError] = useState(null)
@@ -226,6 +295,7 @@ export const AppsAudit = ({
                 results,
                 systemInfo,
                 serverHeader,
+                retireInfo,
             })
             const blob = new Blob([html], { type: 'text/html' })
             downloadBlob(
@@ -245,13 +315,22 @@ export const AppsAudit = ({
                 <div className={classes.panelWithAction}>
                     <NoticeBox title={i18n.t('Apps Audit')}>
                         {i18n.t(
-                            'Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious JavaScript. Each app is fetched from this server and analyzed locally; nothing is uploaded externally.'
+                            'Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious JavaScript, check the libraries they bundle against known vulnerabilities, and compare their files against a recorded integrity baseline. Each app is fetched from this server and analyzed in your browser; no instance data is sent anywhere.'
                         )}
                     </NoticeBox>
                     <Button primary onClick={onStart}>
                         {i18n.t('Start Apps Audit')}
                     </Button>
                 </div>
+                <RetirePanel
+                    retireInfo={retireInfo}
+                    vulnerable={0}
+                    signatures={signatures}
+                    signaturesStale={signaturesStale}
+                    signatureError={signatureError}
+                    refreshing={refreshingSignatures}
+                    onFetch={onFetchSignatures}
+                />
             </div>
         )
     }
@@ -293,6 +372,15 @@ export const AppsAudit = ({
     const failures = results.filter((r) => r.status === 'fail').length
     const warnings = results.filter((r) => r.status === 'warning').length
     const notScanned = results.filter((r) => r.notScanned).length
+    const drifted = results.filter(
+        (r) => r.integrity?.state === INTEGRITY.DRIFT
+    ).length
+    const vulnerableAppCount = results.filter(
+        (r) => vulnerableLibraries(r.files).length > 0
+    ).length
+    const hashed = results.filter(
+        (r) => r.integrity && r.integrity.state !== INTEGRITY.UNKNOWN
+    ).length
     return (
         <div className={classes.container}>
             <div className={classes.panelWithAction}>
@@ -324,6 +412,24 @@ export const AppsAudit = ({
                     {i18n.t('Re-run Apps Audit')}
                 </Button>
             </div>
+            <RetirePanel
+                retireInfo={retireInfo}
+                vulnerable={vulnerableAppCount}
+                signatures={signatures}
+                signaturesStale={signaturesStale}
+                signatureError={signatureError}
+                refreshing={refreshingSignatures}
+                onFetch={onFetchSignatures}
+            />
+            <BaselinePanel
+                baseline={baseline}
+                baselineError={baselineError}
+                saving={savingBaseline}
+                onAccept={onAcceptBaseline}
+                drifted={drifted}
+                hashed={hashed}
+                total={results.length}
+            />
             <ResultsTable results={results} />
             <div className={classes.reportButton}>
                 {exportError && (
@@ -335,6 +441,158 @@ export const AppsAudit = ({
                     {generating ? i18n.t('Generating...') : i18n.t('Save Report')}
                 </Button>
             </div>
+        </div>
+    )
+}
+
+// Known-vulnerable library detection, and how much to trust a clean result.
+//
+// The signature set is vendored at build time so the scan works offline, so
+// "no known vulnerabilities" only means "none as of this date". Showing the
+// date turns a silent assumption into something the reader can weigh.
+// How the signatures reached us, so a reader can weigh a clean result.
+const originLabel = (retireInfo, signatures) => {
+    const date = formatSignatureDate(
+        retireInfo?.retrievedAt || signatures?.retrievedAt
+    )
+    if (!date) {
+        return null
+    }
+    return (retireInfo?.origin || (signatures ? 'downloaded' : 'bundled')) ===
+        'downloaded'
+        ? i18n.t('Signatures downloaded {{date}}.', { date })
+        : i18n.t('Using the signatures bundled with this app ({{date}}).', {
+              date,
+          })
+}
+
+const formatSignatureDate = (value) => {
+    if (!value) {
+        return null
+    }
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime())
+        ? String(value)
+        : parsed.toLocaleString()
+}
+
+const RetirePanel = ({
+    retireInfo,
+    vulnerable,
+    signatures,
+    signaturesStale,
+    signatureError,
+    refreshing,
+    onFetch,
+}) => {
+    const origin = originLabel(retireInfo, signatures)
+    const unavailable = retireInfo?.unavailable
+    return (
+        <div className={classes.panelWithAction}>
+            <NoticeBox
+                title={i18n.t('Vulnerable library check')}
+                error={!unavailable && vulnerable > 0}
+                warning={Boolean(unavailable || signatureError)}
+                success={!unavailable && !signatureError && vulnerable === 0}
+            >
+                {unavailable
+                    ? i18n.t(
+                          'The Retire.js signature data could not be loaded, so apps were not checked for known-vulnerable libraries.'
+                      )
+                    : vulnerable > 0
+                    ? i18n.t(
+                          '{{vulnerable}} app(s) bundle a library with a known vulnerability.',
+                          { vulnerable }
+                      )
+                    : retireInfo
+                    ? i18n.t('No known-vulnerable libraries found.')
+                    : i18n.t(
+                          'Apps are checked against the Retire.js advisory database. Starting a scan downloads current signatures if the stored set has aged out; if that download fails, the scan continues with the newest set available.'
+                      )}
+                {origin ? ` ${origin}` : ''}
+                {signaturesStale && !refreshing
+                    ? ' ' +
+                      i18n.t(
+                          'These have aged out and will be refreshed when a scan starts.'
+                      )
+                    : ''}
+                {signatureError
+                    ? ' ' +
+                      i18n.t('Last download attempt failed: {{message}}', {
+                          message: signatureError,
+                      })
+                    : ''}
+            </NoticeBox>
+            <Button onClick={onFetch} disabled={refreshing}>
+                {refreshing
+                    ? i18n.t('Fetching...')
+                    : i18n.t('Fetch latest signatures')}
+            </Button>
+        </div>
+    )
+}
+
+// Baseline state and the one action that changes it.
+//
+// Accepting is explicit and deliberately worded as trust, not bookkeeping: it
+// records whatever is on the server right now as the reference for every
+// future run. Doing that while drift is unexplained would bless it silently,
+// so that case is called out before the button.
+const BaselinePanel = ({
+    baseline,
+    baselineError,
+    saving,
+    onAccept,
+    drifted,
+    hashed,
+    total,
+}) => {
+    const recorded = baseline?.recordedAt
+        ? new Date(baseline.recordedAt).toLocaleString()
+        : null
+    const noHashes = hashed === 0 && total > 0
+
+    return (
+        <div className={classes.panelWithAction}>
+            <NoticeBox
+                title={i18n.t('Integrity baseline')}
+                error={drifted > 0}
+                warning={noHashes}
+                success={Boolean(recorded) && drifted === 0 && !noHashes}
+            >
+                {baselineError ? (
+                    baselineError
+                ) : noHashes ? (
+                    i18n.t(
+                        'No app files could be hashed, so integrity was not checked. Web Crypto is only available over HTTPS.'
+                    )
+                ) : drifted > 0 ? (
+                    i18n.t(
+                        '{{drifted}} app(s) changed on disk without a version change. Investigate before accepting a new baseline — accepting records the current code as trusted.',
+                        { drifted }
+                    )
+                ) : recorded ? (
+                    i18n.t(
+                        'Compared against the baseline recorded {{recorded}}. No app changed without a version change.',
+                        { recorded }
+                    )
+                ) : (
+                    i18n.t(
+                        'No baseline recorded yet. Accept the current state to start detecting apps whose code changes without a version change.'
+                    )
+                )}
+            </NoticeBox>
+            <Button
+                onClick={onAccept}
+                disabled={saving || noHashes}
+                destructive={drifted > 0}
+            >
+                {saving
+                    ? i18n.t('Saving...')
+                    : recorded
+                    ? i18n.t('Accept current state as baseline')
+                    : i18n.t('Record baseline')}
+            </Button>
         </div>
     )
 }
@@ -376,7 +634,12 @@ const formatFileFindings = (file) => {
     )}</div><ul>${rows}</ul></div>`
 }
 
-const buildAppsReportHtml = ({ results, systemInfo, serverHeader }) => {
+const buildAppsReportHtml = ({
+    results,
+    systemInfo,
+    serverHeader,
+    retireInfo,
+}) => {
     const reportDate = new Date().toLocaleString()
     const total = results.length
     const failures = results.filter((r) => r.status === 'fail').length
@@ -384,6 +647,12 @@ const buildAppsReportHtml = ({ results, systemInfo, serverHeader }) => {
     const errors = results.filter((r) => r.status === 'error').length
     const passed = results.filter((r) => r.status === 'pass').length
     const notScanned = results.filter((r) => r.notScanned).length
+    const drifted = results.filter(
+        (r) => r.integrity?.state === INTEGRITY.DRIFT
+    ).length
+    const withVulnerableLibs = results.filter(
+        (r) => vulnerableLibraries(r.files).length > 0
+    ).length
 
     const order = { fail: 0, error: 1, warning: 2, info: 3, pass: 4 }
     const sorted = [...results].sort(
@@ -407,16 +676,40 @@ const buildAppsReportHtml = ({ results, systemInfo, serverHeader }) => {
             const source = appSource(result.app)
             const status = (result.status || 'pass').toUpperCase()
             const statusClass = `status-${(result.status || 'pass').toLowerCase()}`
-            const detailsHtml = result.error
-                ? `<div class="file-error">${escapeHtml(
-                      i18n.t('Error: {{message}}', { message: result.error })
-                  )}</div>`
-                : result.note
-                ? `<div class="file-skipped">${escapeHtml(result.note)}</div>`
-                : (result.files || [])
-                      .map((f) => formatFileFindings(f))
-                      .filter(Boolean)
-                      .join('')
+            const librariesHtml = vulnerableLibraries(result.files)
+                .map((library) => {
+                    const rows = library.vulnerabilities
+                        .map(
+                            (v) =>
+                                `<li>${escapeHtml(describeVulnerability(v))}</li>`
+                        )
+                        .join('')
+                    return `<div class="file-block"><div class="file-src">${escapeHtml(
+                        `${library.component} ${library.version}`
+                    )}</div><ul>${rows}</ul></div>`
+                })
+                .join('')
+            const note = integrityNote(result)
+            const integrityHtml = note
+                ? `<div class="${
+                      result.integrity?.state === INTEGRITY.DRIFT
+                          ? 'file-error'
+                          : 'file-skipped'
+                  }">${escapeHtml(note)}</div>`
+                : ''
+            const detailsHtml =
+                integrityHtml +
+                librariesHtml +
+                (result.error
+                    ? `<div class="file-error">${escapeHtml(
+                          i18n.t('Error: {{message}}', { message: result.error })
+                      )}</div>`
+                    : result.note
+                    ? `<div class="file-skipped">${escapeHtml(result.note)}</div>`
+                    : (result.files || [])
+                          .map((f) => formatFileFindings(f))
+                          .filter(Boolean)
+                          .join(''))
             return `        <tr>
             <td>
                 <strong>${escapeHtml(result.app.name || result.app.key)}</strong>
@@ -472,7 +765,18 @@ const buildAppsReportHtml = ({ results, systemInfo, serverHeader }) => {
         <strong>${escapeHtml(i18n.t('Warnings:'))}</strong> ${warnings}<br>
         <strong>${escapeHtml(i18n.t('Errors:'))}</strong> ${errors}<br>
         <strong>${escapeHtml(i18n.t('Passed:'))}</strong> ${passed}<br>
-        <strong>${escapeHtml(i18n.t('Not scanned:'))}</strong> ${notScanned}
+        <strong>${escapeHtml(i18n.t('Not scanned:'))}</strong> ${notScanned}<br>
+        <strong>${escapeHtml(
+            i18n.t('Changed without a version change:')
+        )}</strong> ${drifted}<br>
+        <strong>${escapeHtml(
+            i18n.t('Apps with vulnerable libraries:')
+        )}</strong> ${withVulnerableLibs}<br>
+        <strong>${escapeHtml(
+            i18n.t('Retire.js signatures:')
+        )}</strong> ${escapeHtml(
+        retireInfo?.retrievedAt || i18n.t('not loaded')
+    )}
     </div>
 
     <h2>${escapeHtml(i18n.t('System Information'))}</h2>

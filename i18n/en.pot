@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-08-04T21:05:55.820Z\n"
-"PO-Revision-Date: 2026-08-04T21:05:55.820Z\n"
+"POT-Creation-Date: 2026-08-05T05:27:12.451Z\n"
+"PO-Revision-Date: 2026-08-05T05:27:12.451Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -26,6 +26,39 @@ msgid ""
 msgstr ""
 "This tool is available for administrators only. You need the {{authAll}} or "
 "{{authSystemSetting}} authority to access the Security Auditor."
+
+msgid "unknown"
+msgstr "unknown"
+
+msgid "Version changed from {{from}} — code differs as expected."
+msgstr "Version changed from {{from}} — code differs as expected."
+
+msgid "No previous baseline for this app."
+msgstr "No previous baseline for this app."
+
+msgid "No files could be hashed, so integrity is unknown."
+msgstr "No files could be hashed, so integrity is unknown."
+
+msgid "Matches the recorded baseline."
+msgstr "Matches the recorded baseline."
+
+msgid "Failed to load the integrity baseline"
+msgstr "Failed to load the integrity baseline"
+
+msgid "Failed to save the integrity baseline"
+msgstr "Failed to save the integrity baseline"
+
+msgid "HTTP {{status}} fetching Retire.js signatures"
+msgstr "HTTP {{status}} fetching Retire.js signatures"
+
+msgid "The downloaded signature data was not usable"
+msgstr "The downloaded signature data was not usable"
+
+msgid "Failed to read stored signatures"
+msgstr "Failed to read stored signatures"
+
+msgid "Failed to store signatures"
+msgstr "Failed to store signatures"
 
 msgid ""
 "index.html redirected to the login page ({{url}}) — the session has "
@@ -50,11 +83,11 @@ msgstr "crawl limit reached"
 msgid "not fetchable"
 msgstr "not fetchable"
 
-msgid "file exceeds size limit"
-msgstr "file exceeds size limit"
-
 msgid "server did not return JavaScript"
 msgstr "server did not return JavaScript"
+
+msgid "file exceeds size limit"
+msgstr "file exceeds size limit"
 
 msgid "Installed App Sources"
 msgstr "Installed App Sources"
@@ -527,9 +560,6 @@ msgstr ""
 "The active check returned username {{username}} with HTTP {{status}} "
 "instead of confirming the admin account."
 
-msgid "unknown"
-msgstr "unknown"
-
 msgid ""
 "The active admin/district check could not be completed. Basic "
 "authentication may be disabled, blocked by SSO/proxy configuration, or "
@@ -606,6 +636,9 @@ msgstr "Info"
 msgid "{{current}} of {{total}} apps scanned"
 msgstr "{{current}} of {{total}} apps scanned"
 
+msgid "fixed in {{version}}"
+msgstr "fixed in {{version}}"
+
 msgid "Hide"
 msgstr "Hide"
 
@@ -626,12 +659,16 @@ msgstr "Apps Audit"
 
 msgid ""
 "Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious "
-"JavaScript. Each app is fetched from this server and analyzed locally; "
-"nothing is uploaded externally."
+"JavaScript, check the libraries they bundle against known vulnerabilities, "
+"and compare their files against a recorded integrity baseline. Each app is "
+"fetched from this server and analyzed in your browser; no instance data is "
+"sent anywhere."
 msgstr ""
 "Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious "
-"JavaScript. Each app is fetched from this server and analyzed locally; "
-"nothing is uploaded externally."
+"JavaScript, check the libraries they bundle against known vulnerabilities, "
+"and compare their files against a recorded integrity baseline. Each app is "
+"fetched from this server and analyzed in your browser; no instance data is "
+"sent anywhere."
 
 msgid "Start Apps Audit"
 msgstr "Start Apps Audit"
@@ -673,11 +710,96 @@ msgstr "Generating..."
 msgid "Save Report"
 msgstr "Save Report"
 
+msgid "Signatures downloaded {{date}}."
+msgstr "Signatures downloaded {{date}}."
+
+msgid "Using the signatures bundled with this app ({{date}})."
+msgstr "Using the signatures bundled with this app ({{date}})."
+
+msgid "Vulnerable library check"
+msgstr "Vulnerable library check"
+
+msgid ""
+"The Retire.js signature data could not be loaded, so apps were not checked "
+"for known-vulnerable libraries."
+msgstr ""
+"The Retire.js signature data could not be loaded, so apps were not checked "
+"for known-vulnerable libraries."
+
+msgid "{{vulnerable}} app(s) bundle a library with a known vulnerability."
+msgstr "{{vulnerable}} app(s) bundle a library with a known vulnerability."
+
+msgid "No known-vulnerable libraries found."
+msgstr "No known-vulnerable libraries found."
+
+msgid ""
+"Apps are checked against the Retire.js advisory database. Starting a scan "
+"downloads current signatures if the stored set has aged out; if that "
+"download fails, the scan continues with the newest set available."
+msgstr ""
+"Apps are checked against the Retire.js advisory database. Starting a scan "
+"downloads current signatures if the stored set has aged out; if that "
+"download fails, the scan continues with the newest set available."
+
+msgid "These have aged out and will be refreshed when a scan starts."
+msgstr "These have aged out and will be refreshed when a scan starts."
+
+msgid "Fetching..."
+msgstr "Fetching..."
+
+msgid "Fetch latest signatures"
+msgstr "Fetch latest signatures"
+
+msgid "Integrity baseline"
+msgstr "Integrity baseline"
+
+msgid ""
+"No app files could be hashed, so integrity was not checked. Web Crypto is "
+"only available over HTTPS."
+msgstr ""
+"No app files could be hashed, so integrity was not checked. Web Crypto is "
+"only available over HTTPS."
+
+msgid ""
+"{{drifted}} app(s) changed on disk without a version change. Investigate "
+"before accepting a new baseline — accepting records the current code as "
+"trusted."
+msgstr ""
+"{{drifted}} app(s) changed on disk without a version change. Investigate "
+"before accepting a new baseline — accepting records the current code as "
+"trusted."
+
+msgid ""
+"Compared against the baseline recorded {{recorded}}. No app changed without "
+"a version change."
+msgstr ""
+"Compared against the baseline recorded {{recorded}}. No app changed without "
+"a version change."
+
+msgid ""
+"No baseline recorded yet. Accept the current state to start detecting apps "
+"whose code changes without a version change."
+msgstr ""
+"No baseline recorded yet. Accept the current state to start detecting apps "
+"whose code changes without a version change."
+
+msgid "Saving..."
+msgstr "Saving..."
+
+msgid "Accept current state as baseline"
+msgstr "Accept current state as baseline"
+
+msgid "Record baseline"
+msgstr "Record baseline"
+
 msgid "N/A"
 msgstr "N/A"
 
 msgid "DHIS2 Apps Audit Report"
 msgstr "DHIS2 Apps Audit Report"
+
+msgid "not loaded"
+msgstr "not loaded"
 
 msgid "System Information"
 msgstr "System Information"
@@ -890,8 +1012,21 @@ msgstr ""
 "scores short ordinary strings — i18n event names, DHIS2 error codes like "
 "\"E7113\" — as candidate base64. Set to 0 to report every one."
 
-msgid "Saving..."
-msgstr "Saving..."
+msgid "Vulnerability Signature Max Age (Minutes)"
+msgstr "Vulnerability Signature Max Age (Minutes)"
+
+msgid ""
+"Starting an Apps Audit downloads current Retire.js vulnerability signatures "
+"from github.com if the stored set is older than this. It is the only "
+"request the app makes outside your DHIS2 instance. Set to 0 to never "
+"download automatically — the signatures bundled with this app are still "
+"used, and the Fetch button still works."
+msgstr ""
+"Starting an Apps Audit downloads current Retire.js vulnerability signatures "
+"from github.com if the stored set is older than this. It is the only "
+"request the app makes outside your DHIS2 instance. Set to 0 to never "
+"download automatically — the signatures bundled with this app are still "
+"used, and the Fetch button still works."
 
 msgid "Save Configuration"
 msgstr "Save Configuration"
@@ -980,6 +1115,9 @@ msgstr "Maximum MB per app file"
 
 msgid "Minimum encoded literal length reported"
 msgstr "Minimum encoded literal length reported"
+
+msgid "Vulnerability signature max age (minutes)"
+msgstr "Vulnerability signature max age (minutes)"
 
 msgid "Configuration must be an object"
 msgstr "Configuration must be an object"
