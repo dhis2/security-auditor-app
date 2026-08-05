@@ -67,6 +67,28 @@ describe('validateConfig', () => {
     })
 })
 
+describe('boolean fields', () => {
+    it('accepts true and false', () => {
+        expect(
+            validateConfig({ ...validConfig, enableCodeAnalysis: true })
+        ).toEqual([])
+        expect(
+            validateConfig({ ...validConfig, enableCodeAnalysis: false })
+        ).toEqual([])
+    })
+
+    it('rejects a non-boolean, including the numeric forms', () => {
+        // An imported config that used 0/1 would otherwise be accepted and
+        // then read as truthy/falsy by accident.
+        expect(
+            validateConfig({ ...validConfig, enableCodeAnalysis: 1 })
+        ).toContain('Obfuscation and code analysis must be true or false')
+        expect(
+            validateConfig({ ...validConfig, enableCodeAnalysis: 'yes' })
+        ).toContain('Obfuscation and code analysis must be true or false')
+    })
+})
+
 describe('REQUIRED_CONFIG_KEYS', () => {
     it('lists exactly the expected keys', () => {
         expect(REQUIRED_CONFIG_KEYS).toEqual([
@@ -80,6 +102,7 @@ describe('REQUIRED_CONFIG_KEYS', () => {
             'maxAppScanMb',
             'maxAppFileMb',
             'minEncodedLiteralLength',
+            'enableCodeAnalysis',
             'maxConsecutiveUnfetchable',
             'retireMaxAgeMinutes',
         ])

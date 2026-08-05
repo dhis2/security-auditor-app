@@ -89,6 +89,7 @@ export const SecurityAuditor = () => {
 
             {activeTab === 'apps' && (
                 <AppsAudit
+                    codeAnalysisEnabled={Boolean(config.enableCodeAnalysis)}
                     status={apps.status}
                     results={apps.results}
                     progress={apps.progress}

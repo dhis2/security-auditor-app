@@ -16,6 +16,7 @@ describe('resolveScanLimits', () => {
                 DEFAULT_SCAN_LIMITS.minEncodedLiteralLength,
             maxConsecutiveUnfetchable:
                 DEFAULT_SCAN_LIMITS.maxConsecutiveUnfetchable,
+            enableCodeAnalysis: DEFAULT_SCAN_LIMITS.enableCodeAnalysis,
         })
     })
 
@@ -26,6 +27,7 @@ describe('resolveScanLimits', () => {
             maxAppFileMb: 1,
             minEncodedLiteralLength: 0,
             maxConsecutiveUnfetchable: 3,
+            enableCodeAnalysis: true,
         })
         expect(limits).toEqual({
             maxFiles: 7,
@@ -33,6 +35,7 @@ describe('resolveScanLimits', () => {
             maxFileBytes: 1 * MB,
             minEncodedLiteralLength: 0,
             maxConsecutiveUnfetchable: 3,
+            enableCodeAnalysis: true,
         })
     })
 
@@ -57,9 +60,21 @@ describe('resolveScanLimits', () => {
 })
 
 describe('SCAN_LIMIT_BOUNDS', () => {
-    it('covers every default, and every default sits inside its bounds', () => {
+    it('is off by default, and honours an explicit true', () => {
+        // Default off: on minified bundles the analysis cannot support a
+        // verdict, and it is the dominant cost of a scan.
+        expect(resolveScanLimits().enableCodeAnalysis).toBe(false)
+        expect(
+            resolveScanLimits({ enableCodeAnalysis: true }).enableCodeAnalysis
+        ).toBe(true)
+    })
+
+    it('covers every numeric default, and each sits inside its bounds', () => {
+        const numericDefaults = Object.keys(DEFAULT_SCAN_LIMITS).filter(
+            (key) => typeof DEFAULT_SCAN_LIMITS[key] === 'number'
+        )
         expect(Object.keys(SCAN_LIMIT_BOUNDS).sort()).toEqual(
-            Object.keys(DEFAULT_SCAN_LIMITS).sort()
+            numericDefaults.sort()
         )
         for (const [key, { min, max }] of Object.entries(SCAN_LIMIT_BOUNDS)) {
             expect(DEFAULT_SCAN_LIMITS[key]).toBeGreaterThanOrEqual(min)

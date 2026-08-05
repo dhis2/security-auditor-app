@@ -1,4 +1,4 @@
-// Single source of truth for the bounds the apps scan operates under.
+// Single source of truth for the settings the apps scan operates under.
 //
 // These are user-configurable rather than baked in: what counts as a
 // reasonable ceiling depends on the instance (how many apps, how large, how
@@ -60,6 +60,28 @@ export const DEFAULT_SCAN_LIMITS = {
     // 8 to 24 would have behaved identically on these bundles. 16 is a
     // judgement call in that range, which is part of why it is configurable.
     minEncodedLiteralLength: 16,
+
+    // Whether to run the js-x-ray code analysis at all.
+    //
+    // Off by default, because on minified production bundles it cannot
+    // support a verdict. Measured across eight DHIS2 2.43.1 apps, every
+    // single one emitted the same findings — unsafe-stmt x3, encoded-literal,
+    // short-identifiers — and every one traced to React, lodash or i18next
+    // rather than to the app. They are reported as informational and
+    // explained, but they answer no question an administrator asked.
+    //
+    // The two checks that do carry a verdict — known-vulnerable libraries and
+    // the integrity baseline — are unaffected by this setting. Neither needs
+    // a parser: both work on the raw text.
+    //
+    // Turning it off also removes the dominant cost of a scan. The analysis
+    // is roughly a second per 640 KB bundle and a run touches 100+ files,
+    // against ~180 ms per file for library detection and ~5 ms for hashing.
+    //
+    // Turn it on when examining an app you have reason to distrust, where an
+    // obfuscated bundle or an eval on attacker-controlled input is worth
+    // hunting for even at the price of reading past the vendor noise.
+    enableCodeAnalysis: false,
 
     // How many discovered paths may fail to fetch in a row before the crawl
     // gives up on an app.
@@ -128,7 +150,12 @@ export const resolveScanLimits = (config = {}) => {
             ? value
             : DEFAULT_SCAN_LIMITS[key]
     }
+    const pickBoolean = (key) => {
+        const value = config?.[key]
+        return typeof value === 'boolean' ? value : DEFAULT_SCAN_LIMITS[key]
+    }
     return {
+        enableCodeAnalysis: pickBoolean('enableCodeAnalysis'),
         maxFiles: pick('maxAppFilesScanned'),
         maxTotalBytes: pick('maxAppScanMb') * MB,
         maxFileBytes: pick('maxAppFileMb') * MB,

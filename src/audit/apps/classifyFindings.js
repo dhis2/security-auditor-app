@@ -172,19 +172,33 @@ export const resultStatus = (result) => {
     if (result.notScanned) {
         return 'info'
     }
-    return appStatus(result.files)
+    // External connectivity is folded in rather than overriding, so an app
+    // that reaches an outside host AND carries a vulnerable library still
+    // reports the worse of the two. It never outranks integrity drift above:
+    // a host an app can talk to is a capability, which may well be the app
+    // doing its job, where drift is evidence that the code is not what was
+    // installed.
+    const external = result.external?.status || 'pass'
+    const code = appStatus(result.files)
+    return STATUS_RANK[external] > STATUS_RANK[code] ? external : code
 }
 
 // Reduce per-file results to a per-app status.
+//
+// A file the analyzer could not read does NOT affect the status. Failing to
+// parse one chunk is missing information, not a finding, and letting it set
+// the badge did real damage: Data Quality carried lodash with a high-severity
+// CVE and displayed as ERROR, so a genuine risk read as a scanner problem.
+// Incompleteness is surfaced separately — see scanIncomplete — so the badge
+// answers one question only: what did we find?
+//
+// Such a file still contributes what it *did* produce. Library detection is
+// regex over raw text and needs no parser, so an unparseable chunk can still
+// prove a vulnerable library is present.
 export const appStatus = (fileResults) => {
     let best = 'pass'
     for (const fr of fileResults || []) {
-        // A file the analyzer could not read can still yield a library
-        // finding, so both contribute regardless of the analyzer's outcome.
-        for (const s of [
-            fr.error ? 'error' : fileStatus(fr.warnings),
-            libraryStatus(fr.libraries),
-        ]) {
+        for (const s of [fileStatus(fr.warnings), libraryStatus(fr.libraries)]) {
             if (STATUS_RANK[s] > STATUS_RANK[best]) {
                 best = s
             }
@@ -192,3 +206,12 @@ export const appStatus = (fileResults) => {
     }
     return best
 }
+
+// Was any of the app's own code left unexamined? True when a file was fetched
+// but could not be analyzed — a parse failure, a file over the size limit, or
+// a crawl that hit its file cap with modules still queued.
+//
+// Deliberately not triggered by discovered paths that turned out not to exist:
+// those are not the app's code, so skipping them costs no coverage.
+export const scanIncomplete = (fileResults) =>
+    (fileResults || []).some((fr) => fr.incomplete)

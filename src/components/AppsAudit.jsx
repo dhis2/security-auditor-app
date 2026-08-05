@@ -14,8 +14,11 @@ import {
 import i18n from '@dhis2/d2-i18n'
 import { APP_SOURCE, appSource } from '../audit/apps/appSource'
 import { INTEGRITY, describeIntegrity } from '../audit/apps/appsBaseline'
-import { vulnerableLibraries } from '../audit/apps/classifyFindings'
-import { explainWarning, hasRiskWarnings } from '../audit/apps/explainFindings'
+import {
+    scanIncomplete,
+    vulnerableLibraries,
+} from '../audit/apps/classifyFindings'
+import { buildFindingSections } from '../audit/apps/groupFindings'
 import { useInstanceInfo } from '../hooks/useInstanceInfo'
 import { APP_VERSION as appVersion } from '../version'
 import { downloadBlob } from '../utils/download'
@@ -45,6 +48,24 @@ const STATUS_CLASS = {
     error: classes.statusError,
     info: classes.statusInfo,
 }
+
+// Shown beside the status when part of the app's code could not be examined.
+//
+// Separate from the status on purpose: "we could not read one chunk" is
+// missing information, not a finding, and it must not be mistaken for either
+// a clean result or a risk. The badge says what we found; this says how much
+// of the app that answer covers.
+const IncompleteMarker = ({ files }) =>
+    scanIncomplete(files) ? (
+        <span
+            className={classes.incompleteMarker}
+            title={i18n.t(
+                'Some of this app’s code could not be examined — see the details. Findings below are still accurate; there may be more that was not seen.'
+            )}
+        >
+            {'\u26A0'}
+        </span>
+    ) : null
 
 const StatusBadge = ({ status }) => {
     const cls = STATUS_CLASS[status] || classes.statusInfo
@@ -93,53 +114,58 @@ const hasDetails = (result) =>
             result.note ||
             integrityNote(result) ||
             vulnerableLibraries(result.files).length > 0 ||
+            (result.external?.hosts || []).length > 0 ||
             (result.files || []).some(
                 (f) => f.error || f.skipped || (f.warnings || []).length > 0
             )
     )
 
-// One line per vulnerable library: what it is, what is wrong, and the CVE to
-// look up. The fixed-in version is the actionable part — it tells whoever
-// maintains the app exactly what to upgrade to.
-const LibraryFindings = ({ files }) => {
-    const libraries = vulnerableLibraries(files)
-    if (libraries.length === 0) {
+// Findings, grouped into severity sections. Each group is headed by two
+// labels — the severity and what the finding is about — so a reader can see
+// how bad something is and what it concerns without reading prose.
+const FindingSections = ({ files, external }) => {
+    const sections = buildFindingSections(files, { external })
+    if (sections.length === 0) {
         return null
     }
     return (
         <div>
-            {libraries.map((library) => (
-                <div key={`${library.component}@${library.version}`}>
-                    <div className={classes.warningRow}>
-                        <span className={classes.warningKind}>
-                            {library.component} {library.version}
-                        </span>
-                    </div>
-                    {library.vulnerabilities.map((vuln, idx) => (
-                        <div key={idx} className={classes.warningRow}>
-                            {describeVulnerability(vuln)}
+            {sections.map((section) => (
+                <div key={section.severity} className={classes.findingSection}>
+                    {section.groups.map((group) => (
+                        <div key={group.subject} className={classes.findingGroup}>
+                            <div className={classes.findingHeader}>
+                                <span
+                                    className={`${classes.severityChip} ${
+                                        classes[
+                                            `severity_${section.severity}`
+                                        ] || ''
+                                    }`}
+                                >
+                                    {section.label}
+                                </span>
+                                <span className={classes.subjectChip}>
+                                    {group.subject}
+                                </span>
+                            </div>
+                            {group.items.map((item, idx) => (
+                                <div key={idx} className={classes.findingItem}>
+                                    <div className={classes.findingTitle}>
+                                        {item.title}
+                                    </div>
+                                    {item.detail ? (
+                                        <div className={classes.findingDetail}>
+                                            {item.detail}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ))}
                         </div>
                     ))}
                 </div>
             ))}
         </div>
     )
-}
-
-// Where in the file a finding sits. Rendered next to the finding value in
-// both the in-app details and the exported report.
-const lineSuffix = (line) => (line ? i18n.t(', line {{line}}', { line }) : '')
-
-const describeVulnerability = (vuln) => {
-    const ids = vuln.identifiers?.CVE?.join(', ') || vuln.identifiers?.githubID
-    const summary = vuln.identifiers?.summary
-    const parts = [
-        vuln.severity ? `[${vuln.severity}]` : null,
-        ids,
-        summary,
-        vuln.below ? i18n.t('fixed in {{version}}', { version: vuln.below }) : null,
-    ].filter(Boolean)
-    return parts.join(' — ')
 }
 
 // Only worth showing when it says something an admin would act on. "Matches
@@ -170,6 +196,7 @@ const AppRow = ({ result }) => {
                 <TableCell>{sourceLabel(source)}</TableCell>
                 <TableCell>
                     <StatusBadge status={status} />
+                    <IncompleteMarker files={result.files} />
                 </TableCell>
                 <TableCell>
                     {expandable ? (
@@ -204,16 +231,9 @@ const AppRow = ({ result }) => {
                                     {integrityNote(result)}
                                 </div>
                             )}
-                            <LibraryFindings files={result.files} />
-                            <FileSection
-                                heading={i18n.t('Code analysis')}
-                                files={partitionFiles(result.files).risky}
-                            />
-                            <FileSection
-                                heading={i18n.t(
-                                    'No risk found — reported for information'
-                                )}
-                                files={partitionFiles(result.files).informational}
+                            <FindingSections
+                                files={result.files}
+                                external={result.external}
                             />
                         </div>
                     </TableCell>
@@ -229,110 +249,8 @@ const AppRow = ({ result }) => {
 // alone ("unsafe-stmt (Function)") tells a reader nothing they can act on.
 // Findings that describe how the file was built rather than what is in it sit
 // under a heading that states plainly that no risk was found.
-const FileFindings = ({ file }) => {
-    if (file.error) {
-        return (
-            <div className={classes.warningRow}>
-                <span className={classes.fileSrc}>{file.src}</span>:{' '}
-                {i18n.t('Error: {{message}}', { message: file.error })}
-            </div>
-        )
-    }
-    if (file.skipped) {
-        return (
-            <div className={classes.warningRow}>
-                <span className={classes.fileSrc}>{file.src}</span>:{' '}
-                {i18n.t('Skipped ({{reason}})', { reason: file.skipped })}
-            </div>
-        )
-    }
-    if (!file.warnings || file.warnings.length === 0) {
-        return null
-    }
-    return (
-        <div>
-            <div className={classes.warningRow}>
-                <span className={classes.fileSrc}>{file.src}</span>
-            </div>
-            {groupWarnings(file.warnings).map((group) => (
-                <WarningRow key={group.key} group={group} />
-            ))}
-        </div>
-    )
-}
-
-// A titled group of file findings. Renders nothing when the group is empty,
-// so an app with only informational findings does not get an empty "Code
-// analysis" heading above it.
-const FileSection = ({ heading, files }) =>
-    files.length === 0 ? null : (
-        <div>
-            <div className={classes.sectionHeading}>{heading}</div>
-            {files.map((file) => (
-                <FileFindings key={file.src} file={file} />
-            ))}
-        </div>
-    )
-
-// The same finding usually fires many times in one file — ExtJS trips the
-// eval check five times over. Repeating an identical row (and an identical
-// explanation) five times buries the point rather than making it, so
-// identical findings collapse into one row with a count.
-const groupWarnings = (warnings) => {
-    const groups = new Map()
-    for (const warning of warnings || []) {
-        const key = `${warning.kind}:${warning.value ?? ''}`
-        const existing = groups.get(key)
-        if (existing) {
-            existing.count += 1
-        } else {
-            groups.set(key, { key, warning, count: 1 })
-        }
-    }
-    return [...groups.values()]
-}
-
-const WarningRow = ({ group }) => {
-    const { warning, count } = group
-    const explained = explainWarning(warning)
-    return (
-        <div className={classes.warningRow}>
-            <span className={classes.warningKind}>
-                {explained ? explained.title : warning.kind}
-            </span>
-            {count > 1 ? <span> {i18n.t('({{count}}x)', { count })}</span> : null}
-            {/* The raw value is only shown when we have nothing better to say
-                about the finding — otherwise the explanation carries it, and
-                a bare "(1.4173309575166464)" is noise. */}
-            {!explained && warning.value ? (
-                <span> ({warning.value})</span>
-            ) : null}
-            {explained ? (
-                <div className={classes.warningDetail}>{explained.detail}</div>
-            ) : null}
-        </div>
-    )
-}
-
-// Split an app's files into the ones carrying a risk finding and the ones
-// that only produced build-artefact observations, so the two can be shown
-// under headings that say which is which.
-const partitionFiles = (files) => {
-    const risky = []
-    const informational = []
-    for (const file of files || []) {
-        if (file.error || file.skipped) {
-            informational.push(file)
-        } else if (hasRiskWarnings(file.warnings)) {
-            risky.push(file)
-        } else if ((file.warnings || []).length > 0) {
-            informational.push(file)
-        }
-    }
-    return { risky, informational }
-}
-
 export const AppsAudit = ({
+    codeAnalysisEnabled,
     status,
     results,
     progress,
@@ -366,6 +284,7 @@ export const AppsAudit = ({
                 systemInfo,
                 serverHeader,
                 retireInfo,
+                codeAnalysisEnabled,
             })
             const blob = new Blob([html], { type: 'text/html' })
             downloadBlob(
@@ -385,7 +304,7 @@ export const AppsAudit = ({
                 <div className={classes.panelWithAction}>
                     <NoticeBox title={i18n.t('Apps Audit')}>
                         {i18n.t(
-                            'Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious JavaScript, check the libraries they bundle against known vulnerabilities, and compare their files against a recorded integrity baseline. Each app is fetched from this server and analyzed in your browser; no instance data is sent anywhere.'
+                            'Check the libraries each installed app bundles against known vulnerabilities, and compare its files against a recorded integrity baseline to detect code that changed without a version change. Each app is fetched from this server and examined in your browser; no instance data is sent anywhere. Obfuscation and code analysis is an extra, slower pass that is off by default — enable it in Configuration.'
                         )}
                     </NoticeBox>
                     <Button primary onClick={onStart}>
@@ -439,6 +358,7 @@ export const AppsAudit = ({
     const failures = results.filter((r) => r.status === 'fail').length
     const warnings = results.filter((r) => r.status === 'warning').length
     const notScanned = results.filter((r) => r.notScanned).length
+    const partiallyExamined = results.filter((r) => scanIncomplete(r.files)).length
     const drifted = results.filter(
         (r) => r.integrity?.state === INTEGRITY.DRIFT
     ).length
@@ -644,71 +564,45 @@ const BaselinePanel = ({
     )
 }
 
-const formatFileFindings = (file) => {
-    if (file.error) {
-        return `<div class="file-error">${escapeHtml(file.src)}: ${escapeHtml(
-            i18n.t('Error: {{message}}', { message: file.error })
-        )}</div>`
-    }
-    if (file.skipped) {
-        return `<div class="file-skipped">${escapeHtml(file.src)}: ${escapeHtml(
-            i18n.t('Skipped ({{reason}})', { reason: file.skipped })
-        )}</div>`
-    }
-    if (!file.warnings || file.warnings.length === 0) {
-        return ''
-    }
-    const rows = groupWarnings(file.warnings)
-        .map(({ warning, count }) => {
-            const explained = explainWarning(warning)
-            const title = explained
-                ? escapeHtml(explained.title)
-                : `<code>${escapeHtml(warning.kind)}</code>`
-            const times = count > 1 ? escapeHtml(` (${count}x)`) : ''
-            // Same rule as the UI: the raw value only appears when there is
-            // no explanation to carry it.
-            const value =
-                !explained && warning.value
-                    ? escapeHtml(` (${warning.value})`)
-                    : ''
-            const line = escapeHtml(lineSuffix(warning.location?.start?.line))
-            const detail = explained
-                ? `<div class="finding-detail">${escapeHtml(
-                      explained.detail
-                  )}</div>`
-                : ''
-            return `<li>${title}${times}${value}${line}${detail}</li>`
-        })
-        .join('')
-    return `<div class="file-block"><div class="file-src">${escapeHtml(
-        file.src
-    )}</div><ul>${rows}</ul></div>`
-}
-
-// Risk findings first under their own heading, then everything that only
-// describes how the file was built, under a heading that says so. Mirrors the
-// grouping in the UI.
-const formatFileSections = (files) => {
-    const { risky, informational } = partitionFiles(files)
-    const section = (heading, group) =>
-        group.length === 0
-            ? ''
-            : `<div class="finding-section">${escapeHtml(heading)}</div>` +
-              group.map(formatFileFindings).filter(Boolean).join('')
-    return (
-        section(i18n.t('Code analysis'), risky) +
-        section(
-            i18n.t('No risk found — reported for information'),
-            informational
+// The report renders the same severity sections as the UI, from the same
+// model — so the two cannot describe an app differently.
+const formatFindingSections = (files, external) =>
+    buildFindingSections(files, { external })
+        .map(
+            (section) => `<div class="finding-section">${section.groups
+                .map(
+                    (group) => `<div class="finding-group">
+                <div class="finding-header"><span class="chip chip-${escapeHtml(
+                    section.severity
+                )}">${escapeHtml(section.label)}</span><span class="chip chip-subject">${escapeHtml(
+                        group.subject
+                    )}</span></div>
+                <ul>${group.items
+                    .map(
+                        (item) =>
+                            `<li><span class="finding-title">${escapeHtml(
+                                item.title
+                            )}</span>${
+                                item.detail
+                                    ? `<div class="finding-detail">${escapeHtml(
+                                          item.detail
+                                      )}</div>`
+                                    : ''
+                            }</li>`
+                    )
+                    .join('')}</ul>
+            </div>`
+                )
+                .join('')}</div>`
         )
-    )
-}
+        .join('')
 
 const buildAppsReportHtml = ({
     results,
     systemInfo,
     serverHeader,
     retireInfo,
+    codeAnalysisEnabled,
 }) => {
     const reportDate = new Date().toLocaleString()
     const total = results.length
@@ -717,6 +611,7 @@ const buildAppsReportHtml = ({
     const errors = results.filter((r) => r.status === 'error').length
     const passed = results.filter((r) => r.status === 'pass').length
     const notScanned = results.filter((r) => r.notScanned).length
+    const partiallyExamined = results.filter((r) => scanIncomplete(r.files)).length
     const drifted = results.filter(
         (r) => r.integrity?.state === INTEGRITY.DRIFT
     ).length
@@ -776,7 +671,7 @@ const buildAppsReportHtml = ({
                       )}</div>`
                     : result.note
                     ? `<div class="file-skipped">${escapeHtml(result.note)}</div>`
-                    : formatFileSections(result.files))
+                    : formatFindingSections(result.files, result.external))
             return `        <tr>
             <td>
                 <strong>${escapeHtml(result.app.name || result.app.key)}</strong>
@@ -784,7 +679,15 @@ const buildAppsReportHtml = ({
             </td>
             <td>${escapeHtml(result.app.version || '-')}</td>
             <td>${escapeHtml(sourceLabel(source))}</td>
-            <td class="${statusClass}">${escapeHtml(status)}</td>
+            <td class="${statusClass}">${escapeHtml(status)}${
+                scanIncomplete(result.files)
+                    ? ` <span class="incomplete" title="${escapeHtml(
+                          i18n.t(
+                              'Some of this app’s code could not be examined — see Not examined below.'
+                          )
+                      )}">\u26A0</span>`
+                    : ''
+            }</td>
             <td>${detailsHtml}</td>
         </tr>`
         })
@@ -815,6 +718,19 @@ const buildAppsReportHtml = ({
         .file-error { font-size: 0.9em; color: #c62828; }
         .file-skipped { font-size: 0.9em; color: #757575; font-style: italic; }
         .finding-section { font-size: 0.8em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.04em; color: #6e7a8a; margin: 14px 0 6px; padding-top: 8px; border-top: 1px solid #e8edf2; }
+        .incomplete { color: #b26a00; cursor: help; }
+        .finding-section { margin-top: 10px; }
+        .finding-group { margin-bottom: 10px; }
+        .finding-header { margin-bottom: 4px; }
+        .chip { display: inline-block; font-size: 0.75em; font-weight: bold; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 10px; margin-right: 6px; }
+        .chip-critical { background: #7f0000; color: #fff; }
+        .chip-high { background: #c62828; color: #fff; }
+        .chip-medium { background: #e65100; color: #fff; }
+        .chip-low { background: #f9a825; color: #3b2f00; }
+        .chip-info { background: #e0e6ec; color: #4a5561; }
+        .chip-unexamined { background: #6e7a8a; color: #fff; }
+        .chip-subject { background: #f2f5f8; color: #2c3e50; font-family: monospace; font-weight: normal; letter-spacing: 0; }
+        .finding-title { color: #34404d; }
         .finding-detail { font-size: 0.9em; color: #6e7a8a; margin-top: 2px; max-width: 70ch; }
         ul { margin: 4px 0 8px 18px; padding: 0; }
         li { font-size: 0.9em; color: #4a4a4a; }
@@ -836,11 +752,19 @@ const buildAppsReportHtml = ({
         <strong>${escapeHtml(i18n.t('Passed:'))}</strong> ${passed}<br>
         <strong>${escapeHtml(i18n.t('Not scanned:'))}</strong> ${notScanned}<br>
         <strong>${escapeHtml(
+            i18n.t('Partially examined:')
+        )}</strong> ${partiallyExamined}<br>
+        <strong>${escapeHtml(
             i18n.t('Changed without a version change:')
         )}</strong> ${drifted}<br>
         <strong>${escapeHtml(
             i18n.t('Apps with vulnerable libraries:')
         )}</strong> ${withVulnerableLibs}<br>
+        <strong>${escapeHtml(
+            i18n.t('Obfuscation and code analysis:')
+        )}</strong> ${escapeHtml(
+        codeAnalysisEnabled ? i18n.t('enabled') : i18n.t('not run')
+    )}<br>
         <strong>${escapeHtml(
             i18n.t('Retire.js signatures:')
         )}</strong> ${escapeHtml(

@@ -84,6 +84,19 @@ const RISK_KINDS = new Set([
 
 export const isRiskKind = (kind) => RISK_KINDS.has(kind)
 
+// Severity band for a code-analysis finding, on the same scale the library
+// advisories use, so both can be grouped into one set of sections.
+//
+// Only a positively fingerprinted obfuscator rates high; the other risk kinds
+// are worth a look but are not conclusive on a minified bundle. Everything
+// else describes how the file was built and is informational.
+export const warningSeverity = (kind) => {
+    if (kind === 'obfuscated-code') {
+        return 'high'
+    }
+    return RISK_KINDS.has(kind) ? 'medium' : 'info'
+}
+
 // Returns { title, detail } for a warning, or null for a kind we have nothing
 // useful to say about — better to show the raw kind than invent an
 // explanation for it.
@@ -91,7 +104,3 @@ export const explainWarning = (warning) => {
     const build = EXPLANATIONS[warning?.kind]
     return build ? build(warning.value) : null
 }
-
-// Does this file's set of warnings contain anything we would call a risk?
-export const hasRiskWarnings = (warnings) =>
-    (warnings || []).some((w) => isRiskKind(w.kind))

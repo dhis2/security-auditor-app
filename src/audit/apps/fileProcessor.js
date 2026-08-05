@@ -1,4 +1,5 @@
 import { suppressBenign } from './suppressBenign'
+import { findEndpoints, findSinks } from './externalEndpoints'
 import { hashSource } from './hashSource'
 import { findModuleImports } from './moduleImports'
 import { scanFile as retireScanFile } from './retireScan'
@@ -52,9 +53,14 @@ export const processSource = async ({
         ? retireScanFile({ src, content: source }, repository)
         : []
     const imports = findModuleImports(source)
+    // Like hashing and library detection, this is a function of the raw text
+    // and needs no parser — so it runs whatever `skipAnalysis` says. A file
+    // too large to parse is exactly one you still want the destinations of.
+    const endpoints = findEndpoints(source)
+    const sinks = findSinks(source)
 
     if (skipAnalysis || typeof analyze !== 'function') {
-        return { hash, libraries, imports }
+        return { hash, libraries, imports, endpoints, sinks }
     }
 
     try {
@@ -68,6 +74,8 @@ export const processSource = async ({
             hash,
             libraries,
             imports,
+            endpoints,
+            sinks,
             warnings,
             isMinified: !!result?.isMinified,
         }
@@ -76,6 +84,8 @@ export const processSource = async ({
             hash,
             libraries,
             imports,
+            endpoints,
+            sinks,
             analyzeError: err.message || String(err),
         }
     }

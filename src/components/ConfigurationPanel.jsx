@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
     Card,
     Button,
+    CheckboxField,
     InputField,
     NoticeBox,
     ButtonStrip,
@@ -63,6 +64,11 @@ export const ConfigurationPanel = ({
 
     const handleChange = (key, value) => {
         setLocalConfig((prev) => ({ ...prev, [key]: parseInt(value, 10) }))
+        setSaveMessage(null)
+    }
+
+    const handleToggle = (key, checked) => {
+        setLocalConfig((prev) => ({ ...prev, [key]: checked }))
         setSaveMessage(null)
     }
 
@@ -277,6 +283,17 @@ export const ConfigurationPanel = ({
                     )}
                 />
 
+                <CheckboxField
+                    label={i18n.t('Run obfuscation and code analysis')}
+                    checked={Boolean(localConfig.enableCodeAnalysis)}
+                    onChange={({ checked }) =>
+                        handleToggle('enableCodeAnalysis', checked)
+                    }
+                    helpText={i18n.t(
+                        'Off by default. Parses each app bundle looking for obfuscation, eval and encoded strings. On minified production code these findings come almost entirely from bundled libraries such as React and lodash, so they are reported as information and never set an app\'s status. The analysis is also the slowest part of a scan, roughly a second per bundle. Checks for known-vulnerable libraries and for changed app code do not use it and always run. Turn it on to examine an app you have reason to distrust.'
+                    )}
+                />
+
                 <InputField
                     label={i18n.t('Maximum Files Scanned Per App')}
                     type="number"
@@ -364,24 +381,6 @@ export const ConfigurationPanel = ({
 
         <Card className={classes.card}>
             <div className={classes.header}>
-                <h3 className={classes.title}>{i18n.t('Import and Export')}</h3>
-                <p className={classes.subtitle}>
-                    {i18n.t('Export configuration as JSON file or import from a saved file')}
-                </p>
-            </div>
-
-            <ButtonStrip className={classes.actions}>
-                <Button onClick={handleExport} disabled={saving}>
-                    {i18n.t('Export Configuration')}
-                </Button>
-                <Button onClick={handleImportClick} disabled={saving}>
-                    {i18n.t('Import Configuration')}
-                </Button>
-            </ButtonStrip>
-        </Card>
-
-        <Card className={classes.card}>
-            <div className={classes.header}>
                 <h3 className={classes.title}>
                     {i18n.t('Vulnerability Signatures')}
                 </h3>
@@ -407,6 +406,24 @@ export const ConfigurationPanel = ({
                     {refreshingSignatures
                         ? i18n.t('Fetching...')
                         : i18n.t('Fetch Latest Signatures')}
+                </Button>
+            </ButtonStrip>
+        </Card>
+
+        <Card className={classes.card}>
+            <div className={classes.header}>
+                <h3 className={classes.title}>{i18n.t('Import and Export')}</h3>
+                <p className={classes.subtitle}>
+                    {i18n.t('Export configuration as JSON file or import from a saved file')}
+                </p>
+            </div>
+
+            <ButtonStrip className={classes.actions}>
+                <Button onClick={handleExport} disabled={saving}>
+                    {i18n.t('Export Configuration')}
+                </Button>
+                <Button onClick={handleImportClick} disabled={saving}>
+                    {i18n.t('Import Configuration')}
                 </Button>
             </ButtonStrip>
         </Card>

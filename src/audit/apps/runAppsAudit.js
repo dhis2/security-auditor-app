@@ -1,6 +1,7 @@
 import { getAnalyzer } from '../../utils/jsXRay'
 import { compareEntry } from './appsBaseline'
 import { resultStatus } from './classifyFindings'
+import { summarizeExternalEndpoints } from './externalEndpoints'
 import { fetchInstalledApps } from './fetchInstalledApps'
 import { createInThreadProcessor } from './fileProcessor'
 import { getRetireRepository } from './retireRepository'
@@ -59,6 +60,15 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
     // the caller (which owns dataStore access) so this runner stays pure.
     const baselineApps = options.baseline?.apps || {}
 
+    // The instance's own hostname. Every app talks to this one, so it is the
+    // baseline against which "external" means anything at all. The app is
+    // served by the instance, so the page's own host is the right answer.
+    const instanceHost =
+        options.instanceHost ??
+        (typeof window !== 'undefined'
+            ? window.location.hostname.toLowerCase()
+            : null)
+
     // Loaded once per run and shared by every app. A failure here must not
     // sink the audit: without it the AST analysis and the integrity baseline
     // still work, and the missing piece is reported rather than assumed
@@ -109,7 +119,11 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
             processFile =
                 workerProcessor?.process ||
                 createInThreadProcessor({
-                    analyze: await getAnalyzer(),
+                    // With the analysis switched off there is nothing for the
+                    // analyzer to do, so its ~250 KB chunk is never fetched.
+                    analyze: limits.enableCodeAnalysis
+                        ? await getAnalyzer()
+                        : null,
                     repository: retireRepository,
                     limits,
                 })
@@ -136,6 +150,10 @@ export const runAppsAudit = async (engine, config = {}, callbacks = {}, options 
                     ...result,
                     integrity: compareEntry(result, stored),
                     baselineEntry: stored || null,
+                    external: summarizeExternalEndpoints(result.files, {
+                        instanceHost,
+                        allowedHosts: options.allowedHosts,
+                    }),
                 }
                 const enriched = {
                     ...withIntegrity,

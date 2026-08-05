@@ -3,6 +3,7 @@ import {
     appStatus,
     libraryStatus,
     resultStatus,
+    scanIncomplete,
     suppressBenign,
     vulnerableLibraries,
 } from './classifyFindings'
@@ -71,13 +72,38 @@ describe('appStatus', () => {
         ).toBe('fail')
     })
 
-    it('reports error if any file errored during fetch/analyze', () => {
+    it('does not let an unreadable file set the status', () => {
+        // Regression: a parse failure used to outrank everything, so Data
+        // Quality — which carries lodash with a high-severity CVE — displayed
+        // as ERROR and its real risk read as a scanner problem. Incompleteness
+        // is reported separately, by scanIncomplete.
         expect(
             appStatus([
                 { src: 'a.js', warnings: [] },
-                { src: 'b.js', error: 'Fetch failed' },
+                { src: 'b.js', error: 'Analyzer failed', incomplete: true },
             ])
-        ).toBe('error')
+        ).toBe('pass')
+    })
+
+    it('still counts what an unreadable file did produce', () => {
+        // Library detection is regex over raw text, so an unparseable chunk
+        // can still prove a vulnerable library is present.
+        expect(
+            appStatus([
+                {
+                    src: 'b.js',
+                    error: 'Analyzer failed',
+                    incomplete: true,
+                    libraries: [
+                        {
+                            component: 'lodash',
+                            version: '4.17.21',
+                            vulnerabilities: [{ severity: 'high' }],
+                        },
+                    ],
+                },
+            ])
+        ).toBe('fail')
     })
 })
 
@@ -186,6 +212,27 @@ describe('appStatus with libraries', () => {
                 },
             ])
         ).toBe('fail')
+    })
+})
+
+describe('scanIncomplete', () => {
+    it('is true when app code was fetched but not examined', () => {
+        expect(scanIncomplete([{ src: 'a.js', incomplete: true }])).toBe(true)
+    })
+
+    it('is false for a fully examined app', () => {
+        expect(scanIncomplete([{ src: 'a.js', warnings: [] }])).toBe(false)
+        expect(scanIncomplete([])).toBe(false)
+        expect(scanIncomplete(undefined)).toBe(false)
+    })
+
+    it('is not triggered by discovered paths that do not exist', () => {
+        // Those are not the app's code, so skipping them costs no coverage.
+        expect(
+            scanIncomplete([
+                { src: './af.js', skipped: 'not fetchable', unfetchable: true },
+            ])
+        ).toBe(false)
     })
 })
 

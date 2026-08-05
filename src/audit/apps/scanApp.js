@@ -191,6 +191,7 @@ const crawl = async ({
                     count: queue.length,
                 }),
                 skipped: i18n.t('crawl limit reached'),
+                incomplete: true,
             })
             break
         }
@@ -278,21 +279,40 @@ const scanFile = async ({ src, url, discovered }, { fetchText, limits, processFi
         }
     }
 
-    // Too large to parse, but still worth hashing and matching against the
-    // library signatures — the processor skips only the analysis.
-    const skipAnalysis = source.length > limits.maxFileBytes
+    // Two separate reasons to skip the parse, which must not be conflated.
+    //
+    // Too large: this is app code we wanted to examine and could not, so the
+    // file is reported as skipped and the app as partially examined.
+    //
+    // Analysis switched off: nothing is missing, because nothing was meant to
+    // be looked at. Reporting that as a gap on every file of every app would
+    // be noise, and marking the app incomplete would be false.
+    const tooLarge = source.length > limits.maxFileBytes
+    const skipAnalysis = tooLarge || !limits.enableCodeAnalysis
 
-    const { hash, libraries, imports, warnings, isMinified, analyzeError } =
-        await processFile({ src, source, skipAnalysis })
+    const {
+        hash,
+        libraries,
+        imports,
+        endpoints,
+        sinks,
+        warnings,
+        isMinified,
+        analyzeError,
+    } = await processFile({ src, source, skipAnalysis })
 
-    if (skipAnalysis) {
+    if (tooLarge) {
         return {
             src,
             hash,
             libraries,
             imports,
+            endpoints,
+            sinks,
             skipped: i18n.t('file exceeds size limit'),
             sizeBytes: source.length,
+            // Real app code we fetched but did not examine.
+            incomplete: true,
         }
     }
     if (analyzeError) {
@@ -301,10 +321,13 @@ const scanFile = async ({ src, url, discovered }, { fetchText, limits, processFi
             hash,
             libraries,
             imports,
+            endpoints,
+            sinks,
             sizeBytes: source.length,
             error: i18n.t('Analyzer failed: {{message}}', {
                 message: analyzeError,
             }),
+            incomplete: true,
         }
     }
     return {
@@ -313,6 +336,8 @@ const scanFile = async ({ src, url, discovered }, { fetchText, limits, processFi
         imports,
         hash,
         libraries,
+        endpoints,
+        sinks,
         isMinified,
         sizeBytes: source.length,
     }

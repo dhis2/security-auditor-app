@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-08-05T06:20:19.743Z\n"
-"PO-Revision-Date: 2026-08-05T06:20:19.743Z\n"
+"POT-Creation-Date: 2026-08-05T09:19:58.210Z\n"
+"PO-Revision-Date: 2026-08-05T09:19:58.211Z\n"
 
 msgid "Error"
 msgstr "Error"
@@ -160,6 +160,60 @@ msgstr ""
 "MD5 or SHA-1 appears in this file. Both are unsuitable for signatures or "
 "passwords, though they remain common for non-security uses such as cache "
 "keys."
+
+msgid "CRITICAL"
+msgstr "CRITICAL"
+
+msgid "HIGH"
+msgstr "HIGH"
+
+msgid "MEDIUM"
+msgstr "MEDIUM"
+
+msgid "LOW"
+msgstr "LOW"
+
+msgid "INFO"
+msgstr "INFO"
+
+msgid "NOT EXAMINED"
+msgstr "NOT EXAMINED"
+
+msgid "UNKNOWN"
+msgstr "UNKNOWN"
+
+msgid "Fixed in {{version}}"
+msgstr "Fixed in {{version}}"
+
+msgid "Known vulnerability"
+msgstr "Known vulnerability"
+
+msgid "reachable from code that opens connections"
+msgstr "reachable from code that opens connections"
+
+msgid "unencrypted ({{schemes}})"
+msgstr "unencrypted ({{schemes}})"
+
+msgid "non-standard protocol ({{schemes}})"
+msgstr "non-standard protocol ({{schemes}})"
+
+msgid "hardcoded IP address"
+msgstr "hardcoded IP address"
+
+msgid "punycode (non-ASCII) name"
+msgstr "punycode (non-ASCII) name"
+
+msgid "in {{files}}"
+msgstr "in {{files}}"
+
+msgid "External connections"
+msgstr "External connections"
+
+msgid "Connection APIs present in this app"
+msgstr "Connection APIs present in this app"
+
+msgid "Not examined"
+msgstr "Not examined"
 
 msgid "HTTP {{status}} fetching Retire.js signatures"
 msgstr "HTTP {{status}} fetching Retire.js signatures"
@@ -737,29 +791,21 @@ msgstr "Manual"
 msgid "Unknown"
 msgstr "Unknown"
 
+msgid ""
+"Some of this app’s code could not be examined — see the details. Findings "
+"below are still accurate; there may be more that was not seen."
+msgstr ""
+"Some of this app’s code could not be examined — see the details. Findings "
+"below are still accurate; there may be more that was not seen."
+
 msgid "{{current}} of {{total}} apps scanned"
 msgstr "{{current}} of {{total}} apps scanned"
-
-msgid ", line {{line}}"
-msgstr ", line {{line}}"
-
-msgid "fixed in {{version}}"
-msgstr "fixed in {{version}}"
 
 msgid "Hide"
 msgstr "Hide"
 
 msgid "Details"
 msgstr "Details"
-
-msgid "Code analysis"
-msgstr "Code analysis"
-
-msgid "No risk found — reported for information"
-msgstr "No risk found — reported for information"
-
-msgid "Skipped ({{reason}})"
-msgstr "Skipped ({{reason}})"
 
 msgid "Unable to detect"
 msgstr "Unable to detect"
@@ -771,17 +817,19 @@ msgid "Apps Audit"
 msgstr "Apps Audit"
 
 msgid ""
-"Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious "
-"JavaScript, check the libraries they bundle against known vulnerabilities, "
-"and compare their files against a recorded integrity baseline. Each app is "
-"fetched from this server and analyzed in your browser; no instance data is "
-"sent anywhere."
+"Check the libraries each installed app bundles against known "
+"vulnerabilities, and compare its files against a recorded integrity "
+"baseline to detect code that changed without a version change. Each app is "
+"fetched from this server and examined in your browser; no instance data is "
+"sent anywhere. Obfuscation and code analysis is an extra, slower pass that "
+"is off by default — enable it in Configuration."
 msgstr ""
-"Scan installed DHIS2 apps for obfuscated, encoded, or otherwise suspicious "
-"JavaScript, check the libraries they bundle against known vulnerabilities, "
-"and compare their files against a recorded integrity baseline. Each app is "
-"fetched from this server and analyzed in your browser; no instance data is "
-"sent anywhere."
+"Check the libraries each installed app bundles against known "
+"vulnerabilities, and compare its files against a recorded integrity "
+"baseline to detect code that changed without a version change. Each app is "
+"fetched from this server and examined in your browser; no instance data is "
+"sent anywhere. Obfuscation and code analysis is an extra, slower pass that "
+"is off by default — enable it in Configuration."
 
 msgid "Start Apps Audit"
 msgstr "Start Apps Audit"
@@ -902,8 +950,17 @@ msgstr "Record baseline"
 msgid "N/A"
 msgstr "N/A"
 
+msgid "Some of this app’s code could not be examined — see Not examined below."
+msgstr "Some of this app’s code could not be examined — see Not examined below."
+
 msgid "DHIS2 Apps Audit Report"
 msgstr "DHIS2 Apps Audit Report"
+
+msgid "enabled"
+msgstr "enabled"
+
+msgid "not run"
+msgstr "not run"
 
 msgid "not loaded"
 msgstr "not loaded"
@@ -1068,6 +1125,26 @@ msgstr ""
 "Number of installed apps scanned in parallel by the Apps Audit. Higher "
 "values fetch faster but use more CPU during obfuscation analysis."
 
+msgid "Run obfuscation and code analysis"
+msgstr "Run obfuscation and code analysis"
+
+msgid ""
+"Off by default. Parses each app bundle looking for obfuscation, eval and "
+"encoded strings. On minified production code these findings come almost "
+"entirely from bundled libraries such as React and lodash, so they are "
+"reported as information and never set an app's status. The analysis is also "
+"the slowest part of a scan, roughly a second per bundle. Checks for "
+"known-vulnerable libraries and for changed app code do not use it and "
+"always run. Turn it on to examine an app you have reason to distrust."
+msgstr ""
+"Off by default. Parses each app bundle looking for obfuscation, eval and "
+"encoded strings. On minified production code these findings come almost "
+"entirely from bundled libraries such as React and lodash, so they are "
+"reported as information and never set an app's status. The analysis is also "
+"the slowest part of a scan, roughly a second per bundle. Checks for "
+"known-vulnerable libraries and for changed app code do not use it and "
+"always run. Turn it on to examine an app you have reason to distrust."
+
 msgid "Maximum Files Scanned Per App"
 msgstr "Maximum Files Scanned Per App"
 
@@ -1138,18 +1215,6 @@ msgstr "Save Configuration"
 msgid "Reset to Defaults"
 msgstr "Reset to Defaults"
 
-msgid "Import and Export"
-msgstr "Import and Export"
-
-msgid "Export configuration as JSON file or import from a saved file"
-msgstr "Export configuration as JSON file or import from a saved file"
-
-msgid "Export Configuration"
-msgstr "Export Configuration"
-
-msgid "Import Configuration"
-msgstr "Import Configuration"
-
 msgid "Vulnerability Signatures"
 msgstr "Vulnerability Signatures"
 
@@ -1167,6 +1232,18 @@ msgstr "Fetching..."
 
 msgid "Fetch Latest Signatures"
 msgstr "Fetch Latest Signatures"
+
+msgid "Import and Export"
+msgstr "Import and Export"
+
+msgid "Export configuration as JSON file or import from a saved file"
+msgstr "Export configuration as JSON file or import from a saved file"
+
+msgid "Export Configuration"
+msgstr "Export Configuration"
+
+msgid "Import Configuration"
+msgstr "Import Configuration"
 
 msgid "Current signatures"
 msgstr "Current signatures"
@@ -1261,6 +1338,9 @@ msgstr "Maximum MB per app file"
 msgid "Minimum encoded literal length reported"
 msgstr "Minimum encoded literal length reported"
 
+msgid "Obfuscation and code analysis"
+msgstr "Obfuscation and code analysis"
+
 msgid "Maximum unfetchable paths in a row"
 msgstr "Maximum unfetchable paths in a row"
 
@@ -1269,6 +1349,9 @@ msgstr "Vulnerability signature max age (minutes)"
 
 msgid "Configuration must be an object"
 msgstr "Configuration must be an object"
+
+msgid "{{label}} must be true or false"
+msgstr "{{label}} must be true or false"
 
 msgid "{{label}} must be a number"
 msgstr "{{label}} must be a number"
@@ -1306,14 +1389,8 @@ msgstr "RISK"
 msgid "ERROR"
 msgstr "ERROR"
 
-msgid "INFO"
-msgstr "INFO"
-
 msgid "RUNNING"
 msgstr "RUNNING"
-
-msgid "UNKNOWN"
-msgstr "UNKNOWN"
 
 msgid "Security Auditor Version"
 msgstr "Security Auditor Version"
