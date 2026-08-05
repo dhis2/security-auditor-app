@@ -148,6 +148,124 @@ describe('scheme labels', () => {
     })
 })
 
+describe('the allowlist admits only hosts nobody else can publish to', () => {
+    // The condition that matters. A code-hosting or package host is exactly
+    // where a payload would be fetched from, so allow-listing one would hide
+    // the single case this check exists to catch.
+    it.each([
+        'github.com',
+        'raw.githubusercontent.com',
+        'gist.githubusercontent.com',
+        'registry.npmjs.org',
+        'www.npmjs.com',
+        'attacker.github.io',
+        'jedwatson.github.io',
+        'stackoverflow.com',
+        'sodipodi.sourceforge.net',
+        'fb.me',
+        'cra.link',
+        'apps.dhis2.org',
+    ])('does not allow %s', (host) => {
+        expect(isAllowedHost(host)).toBe(false)
+    })
+
+    it.each([
+        'www.w3.org',
+        'schema.org',
+        'purl.org',
+        'reactjs.org',
+        'docs.dhis2.org',
+    ])('allows %s, which appears as an address and is not publishable', (host) => {
+        expect(isAllowedHost(host)).toBe(true)
+    })
+
+    it('still honours hosts an administrator adds explicitly', () => {
+        expect(isAllowedHost('cdn.example.org', ['cdn.example.org'])).toBe(true)
+    })
+})
+
+describe('addresses versus prose mentions', () => {
+    const hostsOf = (source) => findEndpoints(source).map((e) => e.host)
+
+    it('counts a URL that begins its literal as an address', () => {
+        const [entry] = findEndpoints('fetch("https://api.example.net/x")')
+        expect(entry.addressCount).toBe(1)
+    })
+
+    it('counts a URL quoted inside a sentence as a mention, not an address', () => {
+        // Verbatim from the Temporal polyfill in DHIS2's Data Entry app,
+        // which cites four Chromium bug reports in its RangeError text.
+        const source =
+            'throw new RangeError(`Invalid month ${m} (probably due to https://bugs.chromium.org/p/v8/issues/detail?id=10527)`)'
+        const [entry] = findEndpoints(source)
+        expect(entry.host).toBe('bugs.chromium.org')
+        expect(entry.count).toBe(1)
+        expect(entry.addressCount).toBe(0)
+    })
+
+    it('treats a template literal as an address', () => {
+        expect(
+            findEndpoints('const u = `https://api.example.net/${id}`')[0]
+                .addressCount
+        ).toBe(1)
+    })
+
+    it('treats a split-up literal as an address once folded', () => {
+        // Splitting a URL across concatenated literals is how it gets hidden
+        // from a reader grepping the bundle; folding happens before matching,
+        // so the result still begins its literal.
+        const [entry] = findEndpoints('const u = "https://api" + ".example.net/x"')
+        expect(entry.host).toBe('api.example.net')
+        expect(entry.addressCount).toBe(1)
+    })
+
+    it('still records the host, so it can be counted rather than lost', () => {
+        expect(hostsOf('// see https://docs.example.net for details')).toEqual([
+            'docs.example.net',
+        ])
+    })
+
+    it('excludes a prose-only host from the summary but reports the count', () => {
+        const summary = summarizeExternalEndpoints(
+            [
+                {
+                    src: 'main.js',
+                    sinks: ['fetch'],
+                    endpoints: findEndpoints(
+                        'throw new Error(`see https://bugs.chromium.org/x`)'
+                    ),
+                },
+            ],
+            { instanceHost: 'dhis.example.org' }
+        )
+        expect(summary.hosts).toEqual([])
+        expect(summary.mentionedOnlyCount).toBe(1)
+        // Nothing addressable, so nothing to warn about.
+        expect(summary.status).toBe('pass')
+    })
+
+    it('keeps a host that is used as an address somewhere, even if also mentioned', () => {
+        const summary = summarizeExternalEndpoints(
+            [
+                {
+                    src: 'a.js',
+                    sinks: [],
+                    endpoints: findEndpoints('`see https://x.example.net/doc`'),
+                },
+                {
+                    src: 'b.js',
+                    sinks: ['fetch'],
+                    endpoints: findEndpoints('fetch("https://x.example.net/api")'),
+                },
+            ],
+            { instanceHost: 'dhis.example.org' }
+        )
+        expect(summary.hosts.map((h) => h.host)).toEqual(['x.example.net'])
+        expect(summary.mentionedOnlyCount).toBe(0)
+        expect(summary.status).toBe('warning')
+    })
+})
+
 describe('normalizeHost', () => {
     it('keeps an IPv6 literal intact rather than truncating at its colons', () => {
         expect(normalizeHost('[2001:db8::1]:8443')).toBe('[2001:db8::1]')
@@ -211,6 +329,9 @@ describe('summarizeExternalEndpoints', () => {
         endpoints: hostNames.map((host) => ({
             host,
             count: 1,
+            // Used as an address, i.e. the URL begins its string literal.
+            // Hosts named only inside prose are excluded from the summary.
+            addressCount: 1,
             samples: [`https://${host}/x`],
             schemes: ['https'],
             ip: false,

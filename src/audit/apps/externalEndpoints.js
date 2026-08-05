@@ -101,6 +101,32 @@ const URL_LIKE = /(?:\b([a-z][a-z0-9+.-]{1,31}):\/\/|(?<=["'`])\/\/)([^\s"'`\\<>
 // Where the authority ends and the path begins.
 const AUTHORITY_END = /[/?#]/
 
+// Is this URL the *start* of a string literal, or is it sitting inside prose?
+//
+// An address the app might actually use begins its literal:
+//
+//   fetch("https://api.example.com/x")      "  → address
+//   `https://api.example.com/${id}`         `  → address
+//   "https://api" + ".example.com"          "  → address, once folded
+//
+// A URL quoted inside a sentence does not, and never can be one — the runtime
+// would have to slice the sentence apart first:
+//
+//   `… (probably due to https://bugs.chromium.org/…)`   space → mention
+//
+// That is the whole distinction, and it is decidable from one character. It
+// removes the documentation and error-message URLs that bundled libraries
+// carry — the Temporal polyfill alone cites four Chromium bug reports in its
+// RangeError text — without touching anything reachable.
+//
+// Known limits, both erring towards calling something a mention: a URL that
+// begins mid-literal after other text (`"?next=https://…"`) and one built by
+// interpolation (`` `${base}https://…` ``) are both counted as mentions.
+const QUOTES = new Set(['"', "'", '`'])
+
+const beginsLiteral = (source, index) =>
+    index > 0 && QUOTES.has(source[index - 1])
+
 // A host worth reporting: dotted name with a plausible TLD, an IPv4 literal,
 // or a bracketed IPv6 literal. Requiring the TLD shape is what keeps ordinary
 // prose ("see //foo for details") and version strings out of the results.
@@ -195,8 +221,10 @@ export const findEndpoints = (source) => {
         }
         const existing = byHost.get(host)
         const sample = match[0].slice(0, 120)
+        const asAddress = beginsLiteral(normalized, match.index)
         if (existing) {
             existing.count += 1
+            existing.addressCount += asAddress ? 1 : 0
             if (existing.samples.length < 2 && !existing.samples.includes(sample)) {
                 existing.samples.push(sample)
             }
@@ -206,6 +234,7 @@ export const findEndpoints = (source) => {
         } else {
             byHost.set(host, {
                 host,
+                addressCount: asAddress ? 1 : 0,
                 schemes: scheme ? [scheme] : [],
                 // An xn-- label is a non-ASCII name in disguise. Legitimate
                 // in a bundle serving an IDN, and also how a lookalike domain
@@ -310,71 +339,57 @@ export const sinkLabel = (id) => SINKS.find((s) => s.id === id)?.label || id
 // or data from a CDN is exactly what this check exists to surface, however
 // ordinary the practice is elsewhere — on an air-gapped or
 // patient-data-bearing instance it is a finding, not a detail.
-// Every entry below the namespace block was observed in a real DHIS2 platform
-// bundle: this app's own production build, 1.8 MB across 7 chunks. The whole
-// of its real application code — React, @dhis2/ui, the app itself — yielded
-// exactly eight non-namespace external hosts, every one a documentation or
-// licence link appearing once or twice:
+// The eight non-namespace hosts a platform bundle used to yield — fb.me,
+// jedwatson.github.io, npms.io, cra.link, underscorejs.org, feross.org,
+// openjsf.org, stackoverflow.com — were all documentation or licence links
+// appearing once or twice. They no longer need naming: every one of them is a
+// URL quoted inside prose, so the address/mention rule removes them on
+// evidence rather than by an allowlist entry that has to be maintained and
+// that widens the blind spot each time it grows.
 //
-//   fb.me (prop-types)            jedwatson.github.io (classnames)
-//   npms.io (a ponyfill README)   cra.link (create-react-app)
-//   underscorejs.org (LICENSE)    feross.org (safe-buffer)
-//   openjsf.org, stackoverflow.com (comments in vendor code)
+// Hosts never reported, kept deliberately short.
 //
-// That is the entire steady-state noise floor for a platform app, which is
-// what makes this check worth having: after this allowlist, a DHIS2 app that
-// reports an external host is saying something unusual.
+// Two conditions, and a host must meet both:
+//
+//   1. It appears as an *address* in real bundles, so the mention filter
+//      cannot remove it. Measured across nine DHIS2 2.43.1 bundles, only
+//      three hosts do: www.w3.org (264 occurrences, SVG/XML namespaces),
+//      reactjs.org (7, the minified error-decoder URL) and docs.dhis2.org.
+//
+//   2. A third party cannot publish content there. This is the condition
+//      that matters, and it is why the list no longer contains github.com,
+//      raw.githubusercontent.com, the npm registry, *.github.io, sourceforge
+//      or stackoverflow.com. Those are precisely the hosts a payload would be
+//      fetched from — raw.githubusercontent.com serves arbitrary file content
+//      with permissive CORS — and allow-listing them would have made the one
+//      case worth catching invisible. URL shorteners (fb.me, cra.link) are
+//      out for the same reason: they resolve to somewhere an attacker picks.
+//      apps.dhis2.org is out because the App Hub distributes code.
+//
+// Everything dropped from this list scored zero as an address in the same
+// measurement, so removing them added no noise: the mention filter already
+// accounted for every occurrence.
 const ALLOWED_EXACT = new Set([
-    // XML/SVG/XHTML namespaces. Identifiers, not addresses — never fetched.
+    // Namespace identifiers. Written into SVG and XML markup as identity, not
+    // as somewhere to fetch from, and nobody else can publish at them.
     'www.w3.org',
     'w3.org',
     'schema.org',
     'purl.org',
     'ns.adobe.com',
-    'sodipodi.sourceforge.net',
-    'www.inkscape.org',
     'creativecommons.org',
-    // Specification and documentation links in error messages
-    'developer.mozilla.org',
-    'react.dev',
+    'www.inkscape.org',
+    // React builds its error-decoder link as a real URL literal, so the
+    // mention filter does not catch it.
     'reactjs.org',
     'legacy.reactjs.org',
-    'facebook.github.io',
-    'fb.me',
-    'redux.js.org',
-    'vitejs.dev',
-    'rollupjs.org',
-    'webpack.js.org',
-    'cra.link',
-    'tc39.es',
-    'developers.google.com',
-    'momentjs.com',
-    'lodash.com',
-    'underscorejs.org',
-    'day.js.org',
-    'jedwatson.github.io',
-    'openjsf.org',
-    'feross.org',
-    'npms.io',
-    'stackoverflow.com',
-    // License headers
-    'opensource.org',
-    'www.apache.org',
-    'apache.org',
-    'www.gnu.org',
-    'www.mozilla.org',
-    'unlicense.org',
-    // Package and source metadata
-    'github.com',
-    'www.npmjs.com',
-    'npmjs.com',
-    'registry.npmjs.org',
-    'raw.githubusercontent.com',
-    // DHIS2's own documentation and app hub
+    'react.dev',
+    // DHIS2's own documentation. Note that apps.dhis2.org is deliberately
+    // absent: the App Hub serves application code, so a request to it is
+    // worth seeing.
     'dhis2.org',
     'www.dhis2.org',
     'docs.dhis2.org',
-    'apps.dhis2.org',
 ])
 
 // Localhost and the loopback range: a development leftover, not an external
@@ -448,6 +463,7 @@ export const summarizeExternalEndpoints = (
             const existing = byHost.get(endpoint.host)
             if (existing) {
                 existing.count += endpoint.count
+                existing.addressCount += endpoint.addressCount || 0
                 existing.files.add(file.src)
                 existing.reachable = existing.reachable || fileSinks.length > 0
                 // One host can be reached over several schemes across an
@@ -466,6 +482,7 @@ export const summarizeExternalEndpoints = (
             } else {
                 byHost.set(endpoint.host, {
                     ...endpoint,
+                    addressCount: endpoint.addressCount || 0,
                     schemes: [...(endpoint.schemes || [])],
                     samples: [...endpoint.samples],
                     files: new Set([file.src]),
@@ -475,7 +492,14 @@ export const summarizeExternalEndpoints = (
         }
     }
 
-    const hosts = [...byHost.values()]
+    // A host that never once begins a string literal is named in prose, not
+    // used as an address. Reported as a count rather than listed: it is not a
+    // finding, but dropping it silently would overstate how clean the app is.
+    const all = [...byHost.values()]
+    const mentionedOnly = all.filter((entry) => entry.addressCount === 0)
+
+    const hosts = all
+        .filter((entry) => entry.addressCount > 0)
         .map((entry) => ({
             ...entry,
             files: [...entry.files],
@@ -496,6 +520,12 @@ export const summarizeExternalEndpoints = (
     const status =
         hosts.length === 0 ? 'pass' : reachable.length > 0 ? 'warning' : 'info'
 
-    return { hosts, sinks: [...sinks], reachableCount: reachable.length, status }
+    return {
+        hosts,
+        sinks: [...sinks],
+        reachableCount: reachable.length,
+        mentionedOnlyCount: mentionedOnly.length,
+        status,
+    }
 }
 

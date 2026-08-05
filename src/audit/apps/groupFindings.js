@@ -184,6 +184,22 @@ export const buildFindingSections = (files, { external } = {}) => {
     // Name the APIs once, under the same subject. Which ones are present
     // decides whether a host above is a capability or a string, so the reader
     // should be able to see the evidence for that call.
+    // Hosts named only inside message or documentation text. Counted rather
+    // than listed — they are not addresses the app can use — but never
+    // dropped in silence, since "no external hosts" and "none that are
+    // addresses" are different statements.
+    if (external?.mentionedOnlyCount) {
+        add('info', i18n.t('External connections'), {
+            title: i18n.t(
+                '{{count}} further host(s) appear only inside message text',
+                { count: external.mentionedOnlyCount }
+            ),
+            detail: i18n.t(
+                'A URL quoted inside a sentence — a bundled library citing a bug report in an error message, for example — cannot be an address the app connects to, so these are not listed individually.'
+            ),
+        })
+    }
+
     if (external?.hosts?.length && external.sinks?.length) {
         add(
             external.reachableCount > 0 ? 'medium' : 'info',
