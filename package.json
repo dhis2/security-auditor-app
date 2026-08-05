@@ -1,6 +1,6 @@
 {
   "name": "security-auditor-app",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "description": "DHIS2 Security Auditor",
   "license": "BSD-3-Clause",
   "author": "Michael Markevich",
