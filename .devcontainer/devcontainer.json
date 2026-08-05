@@ -21,6 +21,11 @@
     "containerEnv": {
         "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
         "NPM_CONFIG_IGNORE_SCRIPTS": "true",
+        // yarn 1 ignores NPM_CONFIG_*, so NPM_CONFIG_IGNORE_SCRIPTS above
+        // covers `npm` only. This covers yarn commands run anywhere in the
+        // container, including `yarn global add` below; the repo's own
+        // installs are covered by /.yarnrc, which travels with the checkout.
+        "YARN_IGNORE_SCRIPTS": "true",
         "NPM_CONFIG_AUDIT": "false",
         "NPM_CONFIG_FUND": "false",
         "NPM_CONFIG_SAVE_EXACT": "true",
