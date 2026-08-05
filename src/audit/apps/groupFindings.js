@@ -200,14 +200,18 @@ export const buildFindingSections = (files, { external } = {}) => {
                 '{{count}} further host(s) appear only inside message text',
                 { count: external.mentionedOnlyCount }
             ),
+            // One URL per line: these exist to be skimmed and dismissed, and
+            // a comma-separated run of long URLs cannot be.
             detail: [
-                external.mentionedOnly?.join(', '),
+                (external.mentionedOnly || [])
+                    .map((entry) => entry.sample || entry.host)
+                    .join('\n'),
                 i18n.t(
                     'A URL quoted inside a sentence — a bundled library citing a bug report in an error message, for example — cannot be an address the app connects to.'
                 ),
             ]
                 .filter(Boolean)
-                .join(' — '),
+                .join('\n'),
         })
     }
 

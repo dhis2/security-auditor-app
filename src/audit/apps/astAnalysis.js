@@ -58,25 +58,68 @@ const calleeName = (callee) => {
 // Depth-first walk. Written by hand rather than pulled from a walker library:
 // the shape is trivial, and this runs inside the worker where every added
 // dependency is another copy in a bundle that already carries the analyzer.
-const walk = (node, visit, parent) => {
+const FUNCTION_TYPES = new Set([
+    'FunctionDeclaration',
+    'FunctionExpression',
+    'ArrowFunctionExpression',
+])
+
+const walk = (node, visit, parent, fn) => {
     if (!node || typeof node !== 'object') {
         return
     }
     if (Array.isArray(node)) {
         for (const child of node) {
-            walk(child, visit, parent)
+            walk(child, visit, parent, fn)
         }
         return
     }
     if (typeof node.type === 'string') {
-        visit(node, parent)
+        visit(node, parent, fn)
+        if (FUNCTION_TYPES.has(node.type)) {
+            fn = node
+        }
         parent = node
     }
     for (const key of Object.keys(node)) {
         if (key !== 'type' && key !== 'loc' && key !== 'range') {
-            walk(node[key], visit, parent)
+            walk(node[key], visit, parent, fn)
         }
     }
+}
+
+// Does this function ever assign a `.src`, and to what?
+//
+// A script element that is never given a src loads nothing. That is not a
+// hypothetical: all four createElement("script") calls in DHIS2's Maintenance
+// bundle are the setImmediate polyfill, which creates a script element purely
+// to schedule a callback, and two of them are feature detection that never
+// even keeps the element. Reporting those as a capability to load remote code
+// is simply wrong.
+//
+// When a src *is* assigned a literal, that is the answer to "what does it
+// open" — so it is captured rather than merely counted.
+const srcAssignmentIn = (fn) => {
+    let found = null
+    walk(fn, (node) => {
+        if (found) {
+            return
+        }
+        if (
+            node.type === 'AssignmentExpression' &&
+            node.left?.type === 'MemberExpression' &&
+            node.left.property?.name === 'src'
+        ) {
+            found = {
+                url:
+                    node.right?.type === 'Literal' &&
+                    typeof node.right.value === 'string'
+                        ? node.right.value
+                        : null,
+            }
+        }
+    })
+    return found
 }
 
 // What a string literal is being used for. Only the distinctions that change
@@ -126,14 +169,21 @@ export const analyzeSource = (source, parse) => {
 
     const sinkCalls = []
     const literals = []
+    const pendingScriptTags = []
 
-    walk(ast, (node, parent) => {
+    walk(ast, (node, parent, fn) => {
         if (node.type === 'CallExpression' || node.type === 'NewExpression') {
             const callee = node.callee
             const id =
                 CALL_SINKS.get(calleeName(callee)) ||
                 (isServiceWorkerRegister(callee) ? 'serviceworker' : null) ||
                 (isScriptCreation(node, callee) ? 'script-injection' : null)
+            if (id === 'script-injection') {
+                // Held back until we know whether the element is ever given a
+                // src. Without one it cannot load anything.
+                pendingScriptTags.push({ index: nodeStart(node) ?? 0, fn })
+                return
+            }
             if (id) {
                 sinkCalls.push({ id, index: nodeStart(node) ?? 0 })
             }
@@ -158,6 +208,21 @@ export const analyzeSource = (source, parse) => {
         }
     })
 
+    // A created script element only counts once something assigns its src.
+    const scriptSources = []
+    for (const tag of pendingScriptTags) {
+        // Falls back to the whole program: a script tag created at top level
+        // has no enclosing function, and would otherwise never count.
+        const assignment = srcAssignmentIn(tag.fn || ast)
+        if (!assignment) {
+            continue
+        }
+        sinkCalls.push({ id: 'script-injection', index: tag.index })
+        if (assignment.url) {
+            scriptSources.push({ url: assignment.url, index: tag.index })
+        }
+    }
+
     sinkCalls.sort((a, b) => a.index - b.index)
-    return { sinkCalls, literals }
+    return { sinkCalls, literals, scriptSources }
 }

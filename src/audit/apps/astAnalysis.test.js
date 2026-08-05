@@ -21,9 +21,11 @@ describe('analyzeSource — sinks', () => {
         expect(sinkIds('navigator.serviceWorker.register("/sw.js")')).toEqual([
             'serviceworker',
         ])
-        expect(sinkIds('document.createElement("script")')).toEqual([
-            'script-injection',
-        ])
+        expect(
+            sinkIds(
+                'function f(){var s=document.createElement("script");s.src=u;document.head.appendChild(s)}'
+            )
+        ).toEqual(['script-injection'])
     })
 
     it('does not count the word fetch inside a string', () => {
@@ -47,7 +49,33 @@ describe('analyzeSource — sinks', () => {
     })
 
     it('only treats createElement("script") as injection', () => {
-        expect(sinkIds('document.createElement("div")')).toEqual([])
+        expect(sinkIds('function f(){var s=document.createElement("div");s.src=u}')).toEqual([])
+    })
+
+    it('ignores a script element that is never given a src', () => {
+        // All four createElement("script") calls in DHIS2's Maintenance
+        // bundle are the setImmediate polyfill: it creates a script element
+        // to schedule a callback and never loads anything. Two of them are
+        // feature detection that does not even keep the element.
+        expect(
+            sinkIds(
+                'function f(){var s=d.createElement("script");s.onreadystatechange=g;e.appendChild(s)}'
+            )
+        ).toEqual([])
+        expect(
+            sinkIds('"onreadystatechange" in d.createElement("script")')
+        ).toEqual([])
+    })
+
+    it('reports the URL a script tag is actually given', () => {
+        // The answer to "what does it open", when it is knowable.
+        const { scriptSources } = analyzeSource(
+            'function f(){var s=d.createElement("script");s.src="https://cdn.example.net/a.js";h.appendChild(s)}',
+            parse
+        )
+        expect(scriptSources).toEqual([
+            expect.objectContaining({ url: 'https://cdn.example.net/a.js' }),
+        ])
     })
 })
 

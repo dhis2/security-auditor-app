@@ -243,15 +243,24 @@ describe('mention-only hosts', () => {
             external: {
                 hosts: [],
                 sinks: [],
-                mentionedOnly: ['bugs.chromium.org', 'momentjs.com'],
+                mentionedOnly: [
+                    {
+                        host: 'bugs.chromium.org',
+                        sample: 'https://bugs.chromium.org/p/v8/issues/detail?id=10527',
+                    },
+                    { host: 'momentjs.com', sample: 'https://momentjs.com/docs/' },
+                ],
                 mentionedOnlyCount: 2,
             },
         })
         const [item] = section.groups[0].items
         expect(section.severity).toBe('info')
         expect(item.title).toContain('2')
-        expect(item.detail).toContain('bugs.chromium.org')
-        expect(item.detail).toContain('momentjs.com')
+        // Full URLs, one per line, so each can be checked rather than trusted.
+        expect(item.detail).toContain(
+            'https://bugs.chromium.org/p/v8/issues/detail?id=10527'
+        )
+        expect(item.detail).toContain('https://momentjs.com/docs/')
     })
 
     it('says nothing when every host was used as an address', () => {

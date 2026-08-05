@@ -201,6 +201,8 @@
 }
 
 .findingDetail {
+    /* Some details are lists — one URL per line — so newlines must survive. */
+    white-space: pre-line;
     font-size: 13px;
     color: #6e7a8a;
     line-height: 1.45;

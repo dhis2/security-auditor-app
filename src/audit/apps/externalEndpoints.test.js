@@ -295,7 +295,13 @@ describe('addresses versus prose mentions', () => {
         expect(summary.mentionedOnlyCount).toBe(1)
         // Named, not just counted: a bare count asks the reader to trust the
         // classifier rather than check it.
-        expect(summary.mentionedOnly).toEqual(['bugs.chromium.org'])
+        // Carries the URL as written, not just the host name.
+        expect(summary.mentionedOnly).toEqual([
+            expect.objectContaining({
+                host: 'bugs.chromium.org',
+                sample: expect.stringContaining('bugs.chromium.org/x'),
+            }),
+        ])
         // Nothing addressable, so nothing to warn about.
         expect(summary.status).toBe('pass')
     })

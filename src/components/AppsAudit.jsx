@@ -731,7 +731,7 @@ const buildAppsReportHtml = ({
         .chip-unexamined { background: #6e7a8a; color: #fff; }
         .chip-subject { background: #f2f5f8; color: #2c3e50; font-family: monospace; font-weight: normal; letter-spacing: 0; }
         .finding-title { color: #34404d; }
-        .finding-detail { font-size: 0.9em; color: #6e7a8a; margin-top: 2px; max-width: 70ch; }
+        .finding-detail { white-space: pre-line; font-size: 0.9em; color: #6e7a8a; margin-top: 2px; max-width: 70ch; }
         ul { margin: 4px 0 8px 18px; padding: 0; }
         li { font-size: 0.9em; color: #4a4a4a; }
         code { font-family: monospace; }

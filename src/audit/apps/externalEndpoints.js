@@ -686,10 +686,14 @@ export const summarizeExternalEndpoints = (
     // reader recognises momentjs.com and stackoverflow.com immediately —
     // whereas a bare count asks them to trust the classifier instead of
     // checking it. Sorted so the list is stable between runs.
+    // Carries the URL as written, not just the host. A host name alone still
+    // asks the reader to take the classification on trust — bit.ly says
+    // nothing, `https://bit.ly/2wPqQBk` can be resolved. Sorted so the list
+    // is stable between runs.
     const mentionedOnly = all
         .filter((entry) => entry.addressCount === 0)
-        .map((entry) => entry.host)
-        .sort()
+        .map((entry) => ({ host: entry.host, sample: entry.samples[0] || entry.host }))
+        .sort((a, b) => a.host.localeCompare(b.host))
 
     const hosts = all
         .filter((entry) => entry.addressCount > 0)
