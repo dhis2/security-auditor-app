@@ -1,7 +1,9 @@
 import i18n from '@dhis2/d2-i18n'
 import { suppressBenign } from './classifyFindings'
 import { findEntryAssets } from './findScripts'
+import { hashSource } from './hashSource'
 import { findModuleImports } from './moduleImports'
+import { scanFile as retireScanFile } from './retireScan'
 import { resolveScanLimits } from './scanLimits'
 
 // Size and crawl bounds come from the audit config — see scanLimits.js for
@@ -109,6 +111,7 @@ export const scanApp = async ({
     fetchText = defaultFetchText,
     contextPath,
     config,
+    retireRepository,
 }) => {
     const limits = resolveScanLimits(config)
     const indexRequestUrl = withBypass(buildIndexUrl(app, contextPath))
@@ -171,13 +174,21 @@ export const scanApp = async ({
             analyze,
             fetchText,
             limits,
+            retireRepository,
         }),
     }
 }
 
 // Breadth-first walk over the app's module graph, starting from the entry
 // points declared by index.html.
-const crawl = async ({ entries, indexBaseUrl, analyze, fetchText, limits }) => {
+const crawl = async ({
+    entries,
+    indexBaseUrl,
+    analyze,
+    fetchText,
+    limits,
+    retireRepository,
+}) => {
     const appDir = dirOf(indexBaseUrl)
     const queue = entries.map((src) => ({
         src,
@@ -205,7 +216,12 @@ const crawl = async ({ entries, indexBaseUrl, analyze, fetchText, limits }) => {
         }
 
         const item = queue.shift()
-        const file = await scanFile(item, analyze, fetchText, limits)
+        const file = await scanFile(item, {
+            analyze,
+            fetchText,
+            limits,
+            retireRepository,
+        })
         files.push(file)
         totalBytes += file.sizeBytes || 0
 
@@ -238,7 +254,10 @@ const resolveUrl = (src, base) => {
 // an SPA fallback or a directory listing always does.
 const looksLikeHtml = (source) => /^\s*(<!doctype|<html|<\?xml|<)/i.test(source)
 
-const scanFile = async ({ src, url, discovered }, analyze, fetchText, limits) => {
+const scanFile = async (
+    { src, url, discovered },
+    { analyze, fetchText, limits, retireRepository }
+) => {
     let response
     try {
         response = await fetchText(url)
@@ -254,13 +273,6 @@ const scanFile = async ({ src, url, discovered }, analyze, fetchText, limits) =>
         }
     }
     const source = response.text
-    if (source.length > limits.maxFileBytes) {
-        return {
-            src,
-            skipped: i18n.t('file exceeds size limit'),
-            sizeBytes: source.length,
-        }
-    }
     // DHIS2 answers a missing app path with an HTML page rather than a 404,
     // so a specifier that points at nothing comes back as markup. Feeding
     // that to the analyzer produced "Analyzer failed: Unexpected token '<'"
@@ -272,6 +284,29 @@ const scanFile = async ({ src, url, discovered }, analyze, fetchText, limits) =>
             sizeBytes: source.length,
         }
     }
+    // Hash before anything can bail out. Integrity and analysis answer
+    // different questions and shouldn't share a failure mode: a file that is
+    // too large to parse, or that the analyzer chokes on, is still perfectly
+    // able to tell us whether it changed since the last audit.
+    const hash = await hashSource(source)
+
+    // Known-vulnerable library detection, likewise independent of the AST
+    // analyzer: it is regex matching over the raw text, so it still works on
+    // a file too large to parse.
+    const libraries = retireRepository
+        ? retireScanFile({ src, content: source }, retireRepository)
+        : []
+
+    if (source.length > limits.maxFileBytes) {
+        return {
+            src,
+            hash,
+            libraries,
+            skipped: i18n.t('file exceeds size limit'),
+            sizeBytes: source.length,
+        }
+    }
+
     const imports = findModuleImports(source)
     try {
         const result = analyze(source)
@@ -284,6 +319,8 @@ const scanFile = async ({ src, url, discovered }, analyze, fetchText, limits) =>
             src,
             warnings,
             imports,
+            hash,
+            libraries,
             isMinified: !!result?.isMinified,
             sizeBytes: source.length,
         }
@@ -291,6 +328,9 @@ const scanFile = async ({ src, url, discovered }, analyze, fetchText, limits) =>
         return {
             src,
             imports,
+            hash,
+            libraries,
+            sizeBytes: source.length,
             error: i18n.t('Analyzer failed: {{message}}', {
                 message: err.message,
             }),

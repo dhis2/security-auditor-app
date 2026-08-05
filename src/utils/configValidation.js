@@ -56,6 +56,10 @@ const RULES = {
         getLabel: () => i18n.t('Minimum encoded literal length reported'),
         ...SCAN_LIMIT_BOUNDS.minEncodedLiteralLength,
     },
+    retireMaxAgeMinutes: {
+        getLabel: () => i18n.t('Vulnerability signature max age (minutes)'),
+        ...SCAN_LIMIT_BOUNDS.retireMaxAgeMinutes,
+    },
 }
 
 export const REQUIRED_CONFIG_KEYS = Object.keys(RULES)

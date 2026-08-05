@@ -1,8 +1,10 @@
 import {
     fileStatus,
     appStatus,
+    libraryStatus,
     resultStatus,
     suppressBenign,
+    vulnerableLibraries,
 } from './classifyFindings'
 
 describe('fileStatus', () => {
@@ -76,6 +78,114 @@ describe('appStatus', () => {
                 { src: 'b.js', error: 'Fetch failed' },
             ])
         ).toBe('error')
+    })
+})
+
+describe('libraryStatus', () => {
+    const lib = (severity) => ({
+        component: 'lodash',
+        version: '4.17.21',
+        vulnerabilities: [{ severity }],
+    })
+
+    it('escalates by advisory severity', () => {
+        // Unlike the AST heuristics, these do set a verdict — the claim is
+        // checkable against a published advisory.
+        expect(libraryStatus([lib('critical')])).toBe('fail')
+        expect(libraryStatus([lib('high')])).toBe('fail')
+        expect(libraryStatus([lib('medium')])).toBe('warning')
+        expect(libraryStatus([lib('low')])).toBe('pass')
+    })
+
+    it('passes a library with no applicable advisory', () => {
+        expect(
+            libraryStatus([
+                { component: 'lodash', version: '4.18.1', vulnerabilities: [] },
+            ])
+        ).toBe('pass')
+        expect(libraryStatus([])).toBe('pass')
+        expect(libraryStatus(undefined)).toBe('pass')
+    })
+
+    it('takes the most severe across libraries', () => {
+        expect(libraryStatus([lib('medium'), lib('high')])).toBe('fail')
+    })
+
+    it('treats an unrecognised severity as a warning, not a silent pass', () => {
+        expect(libraryStatus([lib(undefined)])).toBe('warning')
+    })
+})
+
+describe('vulnerableLibraries', () => {
+    it('de-duplicates a library found in several chunks and lists the files', () => {
+        const lodash = {
+            component: 'lodash',
+            version: '4.17.21',
+            vulnerabilities: [{ severity: 'high' }],
+        }
+        const found = vulnerableLibraries([
+            { src: 'a.js', libraries: [lodash] },
+            { src: 'b.js', libraries: [lodash] },
+        ])
+        expect(found).toHaveLength(1)
+        expect(found[0].files).toEqual(['a.js', 'b.js'])
+    })
+
+    it('omits libraries with no applicable advisory', () => {
+        expect(
+            vulnerableLibraries([
+                {
+                    src: 'a.js',
+                    libraries: [
+                        { component: 'react-dom', version: '18.3.1', vulnerabilities: [] },
+                    ],
+                },
+            ])
+        ).toEqual([])
+    })
+
+    it('tolerates files with no library data', () => {
+        expect(vulnerableLibraries([{ src: 'a.js' }])).toEqual([])
+        expect(vulnerableLibraries(undefined)).toEqual([])
+    })
+})
+
+describe('appStatus with libraries', () => {
+    it('fails an app for a vulnerable library even when the analyzer is clean', () => {
+        expect(
+            appStatus([
+                {
+                    src: 'main.js',
+                    warnings: [],
+                    libraries: [
+                        {
+                            component: 'lodash',
+                            version: '4.17.21',
+                            vulnerabilities: [{ severity: 'high' }],
+                        },
+                    ],
+                },
+            ])
+        ).toBe('fail')
+    })
+
+    it('still reports a library found in a file the analyzer could not read', () => {
+        // The 6.4 MB chunk case: regex matching works where parsing does not.
+        expect(
+            appStatus([
+                {
+                    src: 'big.js',
+                    skipped: 'file exceeds size limit',
+                    libraries: [
+                        {
+                            component: 'lodash',
+                            version: '4.17.21',
+                            vulnerabilities: [{ severity: 'high' }],
+                        },
+                    ],
+                },
+            ])
+        ).toBe('fail')
     })
 })
 

@@ -322,6 +322,20 @@ export const ConfigurationPanel = () => {
                         'Encoded-literal findings shorter than this are not reported. The analyzer scores short ordinary strings — i18n event names, DHIS2 error codes like "E7113" — as candidate base64. Set to 0 to report every one.'
                     )}
                 />
+
+                <InputField
+                    label={i18n.t('Vulnerability Signature Max Age (Minutes)')}
+                    type="number"
+                    min={String(SCAN_LIMIT_BOUNDS.retireMaxAgeMinutes.min)}
+                    max={String(SCAN_LIMIT_BOUNDS.retireMaxAgeMinutes.max)}
+                    value={String(localConfig.retireMaxAgeMinutes)}
+                    onChange={({ value }) =>
+                        handleChange('retireMaxAgeMinutes', value)
+                    }
+                    helpText={i18n.t(
+                        'Starting an Apps Audit downloads current Retire.js vulnerability signatures from github.com if the stored set is older than this. It is the only request the app makes outside your DHIS2 instance. Set to 0 to never download automatically — the signatures bundled with this app are still used, and the Fetch button still works.'
+                    )}
+                />
             </div>
 
             <ButtonStrip className={classes.actions}>

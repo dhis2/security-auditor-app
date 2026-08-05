@@ -60,6 +60,21 @@ export const DEFAULT_SCAN_LIMITS = {
     // 8 to 24 would have behaved identically on these bundles. 16 is a
     // judgement call in that range, which is part of why it is configurable.
     minEncodedLiteralLength: 16,
+
+    // How old a downloaded Retire.js signature set may be before the app
+    // offers to fetch a newer one.
+    //
+    // 60 minutes because that is the interval asked for, and it is a
+    // reasonable one: upstream serves the file with a 5-minute cache header
+    // and commits advisories in bursts, so a shorter window would mostly
+    // re-download identical data.
+    //
+    // This is the only outbound request the app makes — everything else talks
+    // to the DHIS2 instance. Set it to 0 to stop scans from reaching out at
+    // all; the vendored signatures still apply and the manual Fetch button
+    // still works, so the choice is about what happens automatically, not
+    // about losing the check.
+    retireMaxAgeMinutes: 60,
 }
 
 // Bounds for each limit, shared by configValidation and the Configuration
@@ -70,6 +85,9 @@ export const SCAN_LIMIT_BOUNDS = {
     maxAppScanMb: { min: 1, max: 256 },
     maxAppFileMb: { min: 1, max: 64 },
     minEncodedLiteralLength: { min: 0, max: 128 },
+    // 0 (never refresh automatically) to four weeks. Wide on purpose: this
+    // governs the app's only outbound request, which is an operator's call.
+    retireMaxAgeMinutes: { min: 0, max: 40320 },
 }
 
 const MB = 1024 * 1024

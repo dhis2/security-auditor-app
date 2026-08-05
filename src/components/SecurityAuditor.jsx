@@ -95,6 +95,16 @@ export const SecurityAuditor = () => {
                     currentAppKey={apps.currentAppKey}
                     error={apps.error}
                     onStart={handleStartAppsAudit}
+                    retireInfo={apps.retireInfo}
+                    signatures={apps.signatures}
+                    signaturesStale={apps.signaturesStale}
+                    signatureError={apps.signatureError}
+                    refreshingSignatures={apps.refreshingSignatures}
+                    onFetchSignatures={apps.fetchSignatures}
+                    baseline={apps.baseline}
+                    baselineError={apps.baselineError}
+                    savingBaseline={apps.savingBaseline}
+                    onAcceptBaseline={apps.acceptBaseline}
                 />
             )}
 

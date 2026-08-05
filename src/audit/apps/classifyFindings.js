@@ -1,3 +1,4 @@
+import { INTEGRITY } from './appsBaseline'
 import { resolveScanLimits } from './scanLimits'
 
 // Map js-x-ray warning kinds to our fail/warning/info/pass status model.
@@ -161,13 +162,71 @@ export const fileStatus = (warnings) => {
     return best
 }
 
+// Known-vulnerable libraries are a different class of finding from the AST
+// heuristics above: the claim is "this bundle contains lodash 4.17.21, which
+// is affected by CVE-2021-23337", which is checkable against a published
+// advisory rather than inferred from what the code looks like. So unlike the
+// heuristics, these do set a verdict.
+//
+// Severity comes from Retire.js, which takes it from the advisory. The
+// mapping is deliberately one step gentler than the raw severity: a
+// vulnerable library in a bundle is not automatically an exploitable path in
+// this app, and an admin cannot patch a bundled dependency themselves — the
+// action is to report it upstream or upgrade DHIS2.
+const SEVERITY_STATUS = {
+    critical: 'fail',
+    high: 'fail',
+    medium: 'warning',
+    low: 'info',
+}
+
+export const libraryStatus = (libraries) => {
+    let best = 'pass'
+    for (const library of libraries || []) {
+        for (const vuln of library.vulnerabilities || []) {
+            const s = SEVERITY_STATUS[vuln.severity] || 'warning'
+            if (STATUS_RANK[s] > STATUS_RANK[best]) {
+                best = s
+            }
+        }
+    }
+    return best
+}
+
+// Every vulnerable library found across an app's files, de-duplicated by
+// component and version — the same library appears in several chunks.
+export const vulnerableLibraries = (files) => {
+    const byKey = new Map()
+    for (const file of files || []) {
+        for (const library of file.libraries || []) {
+            if (!library.vulnerabilities?.length) {
+                continue
+            }
+            const key = `${library.component}@${library.version}`
+            if (!byKey.has(key)) {
+                byKey.set(key, { ...library, files: [] })
+            }
+            byKey.get(key).files.push(file.src)
+        }
+    }
+    return [...byKey.values()]
+}
+
 // Reduce a whole scanApp result to a status. Distinct from appStatus because
 // an app can fail or go unscanned before any file is read — previously those
 // results reached appStatus([]) and were reported as `pass`, so an app whose
 // index.html could not be fetched looked clean.
+//
+// Integrity drift outranks everything the analyzer can say. "This app's code
+// changed while its version stayed the same" is a fact about the server, not
+// a heuristic about the code, and it is the one finding here with no benign
+// explanation on a machine nobody has been editing by hand.
 export const resultStatus = (result) => {
     if (!result) {
         return 'error'
+    }
+    if (result.integrity?.state === INTEGRITY.DRIFT) {
+        return 'fail'
     }
     if (result.error) {
         return 'error'
@@ -182,9 +241,15 @@ export const resultStatus = (result) => {
 export const appStatus = (fileResults) => {
     let best = 'pass'
     for (const fr of fileResults || []) {
-        const s = fr.error ? 'error' : fileStatus(fr.warnings)
-        if (STATUS_RANK[s] > STATUS_RANK[best]) {
-            best = s
+        // A file the analyzer could not read can still yield a library
+        // finding, so both contribute regardless of the analyzer's outcome.
+        for (const s of [
+            fr.error ? 'error' : fileStatus(fr.warnings),
+            libraryStatus(fr.libraries),
+        ]) {
+            if (STATUS_RANK[s] > STATUS_RANK[best]) {
+                best = s
+            }
         }
     }
     return best
