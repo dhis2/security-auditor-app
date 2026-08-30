@@ -13,7 +13,7 @@
     "update-retire-repository": "node scripts/update-retire-repository.js"
   },
   "dependencies": {
-    "@dhis2/app-runtime": "^3.14.6",
+    "@dhis2/app-runtime": "^3.17.4",
     "@dhis2/ui": "^10.9.1",
     "buffer": "6.0.3",
     "js-x-ray": "3.2.0",
